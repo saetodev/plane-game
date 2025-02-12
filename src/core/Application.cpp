@@ -3,11 +3,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void TimeStep::Update() {
+    m_startTime = SDL_GetTicks64();
+    m_deltaTime = (float)(m_startTime - m_endTime) / 1000;
+    m_endTime = m_startTime;
+}
+
 void Application::Run() {
     Init();
     OnInit();
 
     while (m_running) {
+        m_timeStep.Update();
+
+        printf("delta: %f\n", m_timeStep.DeltaTime());
+
         SDL_Event event;
 
         while (SDL_PollEvent(&event)) {
@@ -22,7 +32,7 @@ void Application::Run() {
         SDL_SetRenderDrawColor(m_renderer, 0, 0, 0, 255);
         SDL_RenderClear(m_renderer);
 
-        OnUpdate();
+        OnUpdate(m_timeStep);
 
         SDL_RenderPresent(m_renderer);
     }

@@ -5,7 +5,7 @@ class App : public Application {
 public:
     void OnInit() override {
         {
-            Entity* entity = m_world.CreateEntity();
+            Entity* entity = m_world.entityStorage.CreateEntity();
 
             entity->position.x = 1280 / 2.0f;
             entity->position.y = 720 / 2.0f;
@@ -15,7 +15,7 @@ public:
         }
 
         {
-            Entity* entity = m_world.CreateEntity();
+            Entity* entity = m_world.entityStorage.CreateEntity();
 
             entity->position.x = 300;
             entity->position.y = 200;
@@ -25,11 +25,7 @@ public:
         }
     }
 
-    void OnUpdate() override {
-        Uint64 nowTime = SDL_GetTicks64();
-        float deltaTime = (float)(nowTime - m_lastTime) / 1000.0f;
-        m_lastTime = nowTime;
-
+    void OnUpdate(TimeStep timeStep) override {
         int mouseX, mouseY;
         int mouseState = SDL_GetMouseState(&mouseX, &mouseY);
 
@@ -37,10 +33,9 @@ public:
 
         if ((mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && !m_canDrawPath) {
             m_selectedEntity = m_world.EntityAtPosition(mousePos);
+            Entity* entity = m_world.entityStorage.GetEntity(m_selectedEntity);
 
-            if (m_selectedEntity != 0) {
-                Entity* entity = m_world.GetEntity(m_selectedEntity);
-
+            if (entity) {
                 m_canDrawPath = true;
                 entity->path.clear();
             }
@@ -52,14 +47,14 @@ public:
 
         if (m_canDrawPath) {
             if (mousePos != m_lastMousePos) {
-                Entity* entity = m_world.GetEntity(m_selectedEntity);
+                Entity* entity = m_world.entityStorage.GetEntity(m_selectedEntity);
                 entity->path.push_back(mousePos);
             }
 
             m_lastMousePos = mousePos;
         }
 
-        m_world.DoPhysics(deltaTime);
+        m_world.DoPhysics(timeStep.DeltaTime());
         m_world.Draw(m_renderer);
     }
 private:

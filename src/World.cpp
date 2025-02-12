@@ -18,27 +18,45 @@ static EntityID GenerateEntityID() {
     return id;
 }
 
-Entity* World::CreateEntity() {
-    m_entities.push_back({ .id = GenerateEntityID() });
+Entity* EntityStorage::CreateEntity() {
+    int index = m_entities.size();
+    EntityID id = GenerateEntityID();
+
+    m_entities.push_back({ .id = id });
+    m_entityMap.emplace(id, index);
+
     return &m_entities.back();
 }
 
-Entity* World::GetEntity(EntityID id) {
+void EntityStorage::DestroyEntity(EntityID id) {
+    if (id == 0) {
+        return;
+    }
+
+    if (!m_entityMap.contains(id)) {
+        return;
+    }
+
+    int index = m_entityMap[id];
+
+    m_entities.erase(m_entities.begin() + index);
+    m_entityMap.erase(id);
+}
+
+Entity* EntityStorage::GetEntity(EntityID id) {
     if (id == 0) {
         return NULL;
     }
 
-    for (Entity& entity : m_entities) {
-        if (id == entity.id) {
-            return &entity;
-        }
+    if (m_entityMap.contains(id)) {
+        return &m_entities[m_entityMap[id]];
     }
 
     return NULL;
 }
 
 EntityID World::EntityAtPosition(const Vec2& position) {
-    for (const Entity& entity : m_entities) {
+    for (const Entity& entity : entityStorage) {
         SDL_FRect rect = {
             entity.position.x - (entity.size.x / 2.0f),
             entity.position.y - (entity.size.y / 2.0f),
@@ -73,7 +91,7 @@ static void MoveEntityAlongPath(Entity& entity) {
 }
 
 void World::DoPhysics(float deltaTime) {
-    for (Entity& entity : m_entities) {
+    for (Entity& entity : entityStorage) {
         MoveEntityAlongPath(entity);
 
         entity.position += entity.velocity * deltaTime;
@@ -95,7 +113,7 @@ void World::DoPhysics(float deltaTime) {
 }
 
 void World::Draw(SDL_Renderer* renderer) {
-    for (const Entity& entity : m_entities) {
+    for (const Entity& entity : entityStorage) {
         SDL_FRect rect = {
             entity.position.x - (entity.size.x / 2.0f),
             entity.position.y - (entity.size.y / 2.0f),
