@@ -3,6 +3,8 @@
 
 #include "Basic.h"
 
+#include <string.h>
+
 template<typename T, size_t Capacity>
 class List {
 public:
@@ -11,10 +13,30 @@ public:
         m_data[m_size++] = item;
     }
 
+    void Remove(size_t index) {
+        ASSERT(index >= 0 && index < m_size);
+
+        if (index == m_size - 1) {
+            m_size -= 1;
+            return;
+        }
+
+        void* dest = &m_data[index];
+        void* src = &m_data[index + 1];
+
+        memmove(dest, src, sizeof(T) * (m_size - index));
+
+        m_size -= 1;
+    }
+
     void QuickRemove(size_t index) {
         ASSERT(index >= 0 && index < m_size);
         m_data[index] = m_data[m_size - 1];
         m_size -= 1;
+    }
+
+    void Clear() {
+        m_size = 0;
     }
 
     size_t Size() const {
@@ -23,6 +45,10 @@ public:
 
     bool Full() const {
         return m_size == Capacity;
+    }
+
+    bool Empty() const {
+        return m_size == 0;
     }
 
     T& operator[](size_t index) {
@@ -35,8 +61,8 @@ public:
         return m_data[index];
     }
 private:
-    size_t m_size;
-    T m_data[Capacity];
+    size_t m_size      = 0;
+    T m_data[Capacity] = {};
 };
 
 #endif

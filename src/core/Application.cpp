@@ -15,9 +15,7 @@ void Application::Run() {
 
     while (m_running) {
         m_timeStep.Update();
-
-        printf("delta: %f\n", m_timeStep.DeltaTime());
-
+        
         SDL_Event event;
 
         while (SDL_PollEvent(&event)) {
