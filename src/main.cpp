@@ -1,67 +1,195 @@
 #include "core/Application.h"
 #include "World.h"
 
-static void MoveEntityAlongPath(PhysicsComponent& physics, PathComponent& path) {
-    if (path.points.size() < 2) {
-        return;
+struct Transform {
+    Vec2 position;
+    Vec2 size;
+};
+
+struct Motion {
+    Vec2 velocity;
+};
+
+struct Color {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+};
+
+using Path = std::vector<Vec2>;
+
+struct SpatialSystem : public System {
+    EntityID EntityAtPosition(const Vec2& position) {
+        EntityStorage* entityStorage = EntityStorage::Instance();
+
+        for (EntityID entity : m_entities) {
+            const Transform& transform = entityStorage->GetComponent<Transform>(entity);
+
+            float x0 = transform.position.x - (transform.size.x / 2.0f);
+            float y0 = transform.position.y - (transform.size.y / 2.0f);
+
+            float x1 = x0 + transform.size.x;
+            float y1 = y0 + transform.size.y;
+
+            if (position.x >= x0 && position.x <= x1 && position.y >= y0 && position.y <= y1) {
+                return entity;
+            }
+        }
+
+        return 0;
+    }
+};
+
+struct PhysicsSystem : public System {
+    void Update(TimeStep timeStep) {
+        EntityStorage* entityStorage = EntityStorage::Instance();
+
+        for (EntityID entity : m_entities) {
+            Transform& transform = entityStorage->GetComponent<Transform>(entity);
+            Motion& motion = entityStorage->GetComponent<Motion>(entity);
+            Path& path = entityStorage->GetComponent<Path>(entity);
+
+            MoveEntityAlongPath(transform, motion, path);
+
+            transform.position += motion.velocity * timeStep.DeltaTime();
+
+            float x0 = transform.position.x - (transform.size.x / 2.0f);
+            float y0 = transform.position.y - (transform.size.y / 2.0f);
+
+            float x1 = x0 + transform.size.x;
+            float y1 = y0 + transform.size.y;
+
+            if (x0 <= 0 || x1 >= 1280) {
+                motion.velocity.x = -motion.velocity.x;
+            }
+
+            if (y0 <= 0 || y1 >= 720) {
+                motion.velocity.y = -motion.velocity.y;
+            }
+        }
     }
 
-    Vec2 targetPoint = path.points[0];
-    Vec2 moveVector = targetPoint - physics.position;
+     void MoveEntityAlongPath(Transform& transform, Motion& motion, Path& path) {
+        if (path.size() < 2) {
+            return;
+        }
 
-    if (moveVector.Length() < 1) {
-        path.points.erase(path.points.begin());
+        Vec2 targetPoint = path[0];
+        Vec2 moveVector = targetPoint - transform.position;
 
-        targetPoint = path.points[0];
-        moveVector = targetPoint - physics.position;
+        if (moveVector.Length() < 1) {
+            path.erase(path.begin());
+
+            targetPoint = path[0];
+            moveVector = targetPoint - transform.position;
+        }
+
+        motion.velocity = moveVector.Normalized() * 75;
+    }
+};
+
+struct RenderSystem : public System {
+    void Render(SDL_Renderer* renderer) {
+        EntityStorage* entityStorage = EntityStorage::Instance();
+
+        for (EntityID entity : m_entities) {
+            const Transform& transform = entityStorage->GetComponent<Transform>(entity);
+            const Path& path = entityStorage->GetComponent<Path>(entity);
+            const Color& color = entityStorage->GetComponent<Color>(entity);
+
+            RenderPath(renderer, path);
+
+            SDL_FRect rect = {
+                transform.position.x - (transform.size.x / 2.0f),
+                transform.position.y - (transform.size.y / 2.0f),
+                transform.size.x,
+                transform.size.y,
+            };
+
+            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+            SDL_RenderFillRectF(renderer, &rect);
+        }
     }
 
-    physics.velocity = moveVector.Normalized() * 75;
-}
+    void RenderPath(SDL_Renderer* renderer, const Path& path) {
+        if (path.size() < 2) {
+            return;
+        }
+
+        for (int i = 0; i < path.size() - 1; i++) {
+            Vec2 start = path[i];
+            Vec2 end = path[i + 1];
+
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL_RenderDrawLine(renderer, start.x, start.y, end.x, end.y);
+        }
+    }
+};
 
 class App : public Application {
 public:
     void OnInit() override {
-        m_entityStorage.Register<PhysicsComponent>();
-        m_entityStorage.Register<ColorComponent>();
-        m_entityStorage.Register<PathComponent>();
+        m_entityStorage.RegisterComponent<Transform>();
+        m_entityStorage.RegisterComponent<Motion>();
+        m_entityStorage.RegisterComponent<Path>();
+        m_entityStorage.RegisterComponent<Color>();
 
         {
-            EntityID entity = m_entityStorage.CreateEntity();
+            m_spatialSystem = reinterpret_cast<SpatialSystem*>(m_entityStorage.RegisterSystem<SpatialSystem>());
 
-            PhysicsComponent& physics = m_entityStorage.CreateComponent<PhysicsComponent>(entity);
-            ColorComponent& color = m_entityStorage.CreateComponent<ColorComponent>(entity);
-            m_entityStorage.CreateComponent<PathComponent>(entity);
+            Signature signature;
+            signature.set(m_entityStorage.GetComponentType<Transform>());
 
-            physics.position.x = 1280 / 2.0f;
-            physics.position.y = 720 / 2.0f;
+            m_entityStorage.SetSystemSignature<SpatialSystem>(signature);
+        }
 
-            physics.size.x = 32;
-            physics.size.y = 32;
+        {
+            m_physicsSystem = reinterpret_cast<PhysicsSystem*>(m_entityStorage.RegisterSystem<PhysicsSystem>());
 
-            color.r = 0;
-            color.g = 0;
-            color.b = 255;
-            color.a = 255;
+            Signature signature;
+            signature.set(m_entityStorage.GetComponentType<Transform>());
+            signature.set(m_entityStorage.GetComponentType<Motion>());
+            signature.set(m_entityStorage.GetComponentType<Path>());
+
+            m_entityStorage.SetSystemSignature<PhysicsSystem>(signature);
+        }
+        
+        {
+            m_renderSystem = reinterpret_cast<RenderSystem*>(m_entityStorage.RegisterSystem<RenderSystem>());
+
+            Signature signature;
+            signature.set(m_entityStorage.GetComponentType<Transform>());
+            signature.set(m_entityStorage.GetComponentType<Path>());
+            signature.set(m_entityStorage.GetComponentType<Color>());
+
+            m_entityStorage.SetSystemSignature<RenderSystem>(signature);
         }
 
         {
             EntityID entity = m_entityStorage.CreateEntity();
 
-            PhysicsComponent& physics = m_entityStorage.CreateComponent<PhysicsComponent>(entity);
-            ColorComponent& color = m_entityStorage.CreateComponent<ColorComponent>(entity);
-            m_entityStorage.CreateComponent<PathComponent>(entity);
+            m_entityStorage.AddComponent<Transform>(entity, {
+                .position = { 1280 / 2.0f, 720 / 2.0f },
+                .size = { 32, 32 },
+            });
 
-            physics.position.x = 300;
-            physics.position.y = 200;
+            m_entityStorage.AddComponent<Motion>(entity, {});
+            m_entityStorage.AddComponent<Path>(entity, {});
+            m_entityStorage.AddComponent<Color>(entity, { 0, 0, 255, 255 });
+        }
+        
+        {
+            EntityID entity = m_entityStorage.CreateEntity();
 
-            physics.size.x = 32;
-            physics.size.y = 32;
+            m_entityStorage.AddComponent<Transform>(entity, {
+                .position = { 300, 200 },
+                .size = { 32, 32 },
+            });
 
-            color.r = 0;
-            color.g = 0;
-            color.b = 255;
-            color.a = 255;
+            m_entityStorage.AddComponent<Motion>(entity, {});
+            m_entityStorage.AddComponent<Path>(entity, {});
+            m_entityStorage.AddComponent<Color>(entity, { 128, 0, 255, 255 });
         }
     }
 
@@ -72,16 +200,13 @@ public:
         Vec2 mousePos = { (float)mouseX, (float)mouseY };
 
         if ((mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && !m_canDrawPath) {
-            //m_selectedEntity = m_world.EntityAtPosition(mousePos);
-            //Entity* entity = m_world.entityStorage.GetEntity(m_selectedEntity);
-
-            m_selectedEntity = EntityAtPosition(mousePos);
+            m_selectedEntity = m_spatialSystem->EntityAtPosition(mousePos);
 
             if (m_selectedEntity != 0) {
-                auto& path = m_entityStorage.GetComponent<PathComponent>(m_selectedEntity);
-                
+                Path& path = m_entityStorage.GetComponent<Path>(m_selectedEntity);
+
                 m_canDrawPath = true;
-                path.points.clear();
+                path.clear();
             }
         }
         else if (!(mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && m_canDrawPath) {
@@ -91,93 +216,16 @@ public:
 
         if (m_canDrawPath) {
             if (mousePos != m_lastMousePos) {
-                auto& path = m_entityStorage.GetComponent<PathComponent>(m_selectedEntity);
-                path.points.push_back(mousePos);
+                Path& path = m_entityStorage.GetComponent<Path>(m_selectedEntity);
+                path.push_back(mousePos);
             }
 
             m_lastMousePos = mousePos;
         }
 
-        DoPhysics(timeStep);
-        DoRender(m_renderer);
+        m_physicsSystem->Update(timeStep);
+        m_renderSystem->Render(m_renderer);
     }
-private:
-    EntityID EntityAtPosition(const Vec2& position) {
-        const auto& physicsData = m_entityStorage.GetComponents<PhysicsComponent>();
-
-        for (const ComponentPair<PhysicsComponent>& data : physicsData) {
-            SDL_FRect rect = {
-                data.component.position.x - (data.component.size.x / 2.0f),
-                data.component.position.y - (data.component.size.y / 2.0f),
-                data.component.size.x,
-                data.component.size.y,
-            };
-
-            if ((position.x <= rect.x + rect.w) && (position.x >= rect.x) && (position.y <= rect.y + rect.h) && (position.y >= rect.y)) {
-                return data.id;
-            }
-        }
-        
-        return 0;
-    }
-
-    void DoPhysics(TimeStep timeStep) {
-        std::vector<EntityID> query = m_entityStorage.GetQuery({ typeid(PhysicsComponent), typeid(PathComponent) });
-    
-        for (EntityID entity : query) {
-            PhysicsComponent& physics = m_entityStorage.GetComponent<PhysicsComponent>(entity);
-            PathComponent& path = m_entityStorage.GetComponent<PathComponent>(entity);
-    
-            MoveEntityAlongPath(physics, path);
-    
-            physics.position += physics.velocity * timeStep.DeltaTime();
-    
-            float x0 = physics.position.x - (physics.size.x / 2.0f);
-            float x1 = x0 + physics.size.x;
-    
-            float y0 = physics.position.y - (physics.size.y / 2.0f);
-            float y1 = y0 + physics.size.y;
-    
-            if (x0 <= 0 || x1 >= 1280) {
-                physics.velocity.x = -physics.velocity.x;
-            }
-    
-            if (y0 <= 0 || y1 >= 720) {
-                physics.velocity.y = -physics.velocity.y;
-            }
-        }
-    }
-
-    void DoRender(SDL_Renderer* renderer) {
-        std::vector<EntityID> query = m_entityStorage.GetQuery({ typeid(PhysicsComponent), typeid(PathComponent), typeid(ColorComponent)});
-    
-        for (EntityID entity : query) {
-            auto& physics = m_entityStorage.GetComponent<PhysicsComponent>(entity);
-            auto& path = m_entityStorage.GetComponent<PathComponent>(entity);
-            auto& color = m_entityStorage.GetComponent<ColorComponent>(entity);
-    
-            SDL_FRect rect = {
-                physics.position.x - (physics.size.x / 2.0f),
-                physics.position.y - (physics.size.y / 2.0f),
-                physics.size.x,
-                physics.size.y,
-            };
-    
-            if (path.points.size() > 0) {
-                for (int i = 0; i < path.points.size() - 1; i++) {
-                    Vec2 start = path.points[i];
-                    Vec2 end = path.points[i + 1];
-    
-                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-                    SDL_RenderDrawLine(renderer, start.x, start.y, end.x, end.y);
-                }
-            }
-    
-            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-            SDL_RenderFillRectF(renderer, &rect);
-        }
-    }
-
 private:
     Uint64 m_lastTime = 0;
 
@@ -186,6 +234,10 @@ private:
     Vec2 m_lastMousePos;
 
     EntityStorage m_entityStorage;
+
+    SpatialSystem* m_spatialSystem;
+    PhysicsSystem* m_physicsSystem;
+    RenderSystem* m_renderSystem;
 };
 
 int main(int argc, char** argv) {
