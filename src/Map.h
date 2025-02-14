@@ -29,33 +29,27 @@ public:
     }
 
     void Remove(const K& key) {
-        ASSERT(!Empty());
+        ASSERT(Contains(key));
 
         size_t index = std::hash<K>{}(key) % Capacity;
-        size_t currentIndex = index;
 
-        bool found = false;
+        while (true) {
+            MapEntry<K, V>& entry = m_data[index];
 
-        while (!m_data[currentIndex].empty) {
-            if (key == m_data[currentIndex].first) {
-                found = true;
-                break;
+            if (entry.empty) {
+                index = (index + 1) % Capacity;
+                continue;
             }
 
-            currentIndex = (currentIndex + 1) % Capacity;
+            if (key == entry.first) {
+                entry.empty = true;
+                m_size -= 1;
 
-            // key not in map
-            if (index == currentIndex) {
-                break;
+                return;
             }
-        }
 
-        if (!found) {
-            return;
+            index = (index + 1) % Capacity;
         }
-
-        m_data[currentIndex].empty = true;
-        m_size -= 1;
     }
 
     V& Get(const K& key) {
@@ -63,8 +57,13 @@ public:
 
         size_t index = std::hash<K>{}(key) % Capacity;
 
-        while (!m_data[index].empty) {
+        while (true) {
             MapEntry<K, V>& entry = m_data[index];
+
+            if (entry.empty) {
+                index = (index + 1) % Capacity;
+                continue;
+            }
 
             if (key == entry.first) {
                 return entry.second;
@@ -72,6 +71,8 @@ public:
 
             index = (index + 1) % Capacity;
         }
+
+        ASSERT(false);
     }
 
     void Set(const K& key, const V& value) {
@@ -79,8 +80,13 @@ public:
 
         size_t index = std::hash<K>{}(key) % Capacity;
 
-        while (!m_data[index].empty) {
+        while (true) {
             MapEntry<K, V>& entry = m_data[index];
+
+            if (entry.empty) {
+                index = (index + 1) % Capacity;
+                continue;
+            }
 
             if (key == entry.first) {
                 entry.second = value;
@@ -99,11 +105,16 @@ public:
         size_t index = std::hash<K>{}(key) % Capacity;
         size_t currentIndex = index;
 
-        while (!m_data[currentIndex].empty) {
+        while (true) {
+            if (m_data[currentIndex].empty) {
+                goto NEXT_ENTRY;
+            }
+
             if (key == m_data[currentIndex].first) {
                 return true;
             }
 
+NEXT_ENTRY:
             currentIndex = (currentIndex + 1) % Capacity;
 
             // key not in map

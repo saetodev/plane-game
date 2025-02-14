@@ -16,7 +16,6 @@ static EntityID GenerateEntityID() {
     return id;
 }
 
-
 EntityData* World::CreateEntity(u64 flags) {
     EntityID id = GenerateEntityID();
     size_t index = m_entityData.Size();
@@ -44,16 +43,20 @@ void World::DestroyEntity(EntityID entityID) {
     m_entityData.QuickRemove(currentIndex);
 }
 
+void World::AddSystem(u64 flags, std::function<void(World*, List<EntityID, MAX_ENTITY_COUNT>&)> func) {
+    m_systems.Push({ flags, func });
+}
+
 EntityData* World::GetEntityData(EntityID entityID) {
     if (!m_entityMap.Contains(entityID)) {
         return NULL;
     }
-
-    return &m_entityData[m_entityMap.Get(entityID)];
+    usize index = m_entityMap.Get(entityID);
+    return &m_entityData[index];
 }
 
 List<EntityID, MAX_ENTITY_COUNT> World::EntitiesWithFlags(u64 flags) {
-    List<EntityID, 256> result;
+    List<EntityID, MAX_ENTITY_COUNT> result;
 
     for (int i = 0; i < m_entityData.Size(); i++) {
         const EntityData& entity = m_entityData[i];
@@ -64,4 +67,28 @@ List<EntityID, MAX_ENTITY_COUNT> World::EntitiesWithFlags(u64 flags) {
     }
 
     return result;
+}
+
+void World::RunSystems() {
+    for (int i = 0; i < m_systems.Size(); i++) {
+        const System& system = m_systems[i];
+
+        List<EntityID, MAX_ENTITY_COUNT> entities;
+        
+        for (int i = 0; i < m_entityData.Size(); i++) {
+            const EntityData& entity = m_entityData[i];
+
+            if ((entity.flags & system.flags) == system.flags) {
+                entities.Push(entity.id);
+            }
+        }
+
+        if (entities.Empty()) {
+            continue;
+        }
+
+        if (system.func) {
+            system.func(this, entities);
+        }
+    }
 }

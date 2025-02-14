@@ -10,7 +10,8 @@ class List {
 public:
     void Push(const T& item) {
         ASSERT(m_size < Capacity);
-        m_data[m_size++] = item;
+        m_data[m_size] = item;
+        m_size += 1;
     }
 
     void Remove(size_t index) {

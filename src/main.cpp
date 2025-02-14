@@ -10,7 +10,17 @@ struct Rect {
 };
 
 bool PointInRect(const Vec2& point, const Rect& rect) {
-    return (point.x >= rect.position.x) && (point.x <= rect.position.x + rect.size.x) && (point.y >= rect.position.y) && (point.y <= rect.position.y + rect.size.y);
+    return (point.x >= rect.position.x) && 
+           (point.x <= rect.position.x + rect.size.x) && 
+           (point.y >= rect.position.y) && 
+           (point.y <= rect.position.y + rect.size.y);
+}
+
+bool RectInRect(const Rect& a, const Rect& b) {
+    return (a.position.x + a.size.x >= b.position.x) &&
+           (a.position.x <= b.position.x + b.size.x) && 
+           (a.position.y + a.size.y >= b.position.y) && 
+           (a.position.y <= b.position.y + b.size.y);
 }
 
 Rect GetEntityRect(World& world, EntityID id) {
@@ -66,11 +76,29 @@ void MoveEntityAlongPath(Transform& transform, Motion& motion, List<Vec2, MAX_PA
     motion.velocity = moveVector.Normalized() * 75;
 }
 
-void UpdateEntityPhysics(World& world, TimeStep timeStep) {
-    auto entities = world.EntitiesWithFlags(TRANSFORM | MOTION | PATH);
+void RenderPath(SDL_Renderer* renderer, const List<Vec2, MAX_PATH_SIZE>& path) {
+    if (path.Size() < 2) {
+        return;
+    }
+
+    for (int i = 0; i < path.Size() - 1; i++) {
+        Vec2 start = path[i];
+        Vec2 end = path[i + 1];
+
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        SDL_RenderDrawLine(renderer, start.x, start.y, end.x, end.y);
+    }
+}
+
+void PhysicsSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
+    const TimeStep& timeStep = Application::Instance()->FrameTime();
 
     for (int i = 0; i < entities.Size(); i++) {
-        EntityData* entity = world.GetEntityData(entities[i]);
+        EntityData* entity = world->GetEntityData(entities[i]);
+
+        if (!entity) {
+            continue;
+        }
 
         Transform& transform = entity->transform;
         Motion& motion = entity->motion;
@@ -96,25 +124,39 @@ void UpdateEntityPhysics(World& world, TimeStep timeStep) {
     }
 }
 
-void RenderPath(SDL_Renderer* renderer, const List<Vec2, MAX_PATH_SIZE>& path) {
-    if (path.Size() < 2) {
-        return;
-    }
+void CollisionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
+    for (int i = 0; i < entities.Size() - 1; i++) {
+        for (int j = i + 1; j < entities.Size(); j++) {
+            EntityData* entityA = world->GetEntityData(entities[i]);
+            EntityData* entityB = world->GetEntityData(entities[j]);
 
-    for (int i = 0; i < path.Size() - 1; i++) {
-        Vec2 start = path[i];
-        Vec2 end = path[i + 1];
+            if (!entityA) {
+                break;
+            }
+            else if (!entityB) {
+                continue;
+            }
 
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        SDL_RenderDrawLine(renderer, start.x, start.y, end.x, end.y);
+            Rect rectA = GetEntityRect(*world, entityA->id);
+            Rect rectB = GetEntityRect(*world, entityB->id);
+
+            if (RectInRect(rectA, rectB)) {
+                world->DestroyEntity(entityA->id);
+                world->DestroyEntity(entityB->id);
+            }
+        }
     }
 }
 
-void RenderWorld(SDL_Renderer* renderer, World& world) {
-    auto entities = world.EntitiesWithFlags(EntityFlags::TRANSFORM | EntityFlags::PATH | EntityFlags::RENDERABLE);
+void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
+    SDL_Renderer* renderer = Application::Instance()->Renderer();
 
     for (int i = 0; i < entities.Size(); i++) {
-        EntityData* entity = world.GetEntityData(entities[i]);
+        EntityData* entity = world->GetEntityData(entities[i]);
+
+        if (!entity) {
+            continue;
+        }
 
         const Transform& transform = entity->transform;
         const List<Vec2, MAX_PATH_SIZE>& path = entity->path;
@@ -137,22 +179,23 @@ void RenderWorld(SDL_Renderer* renderer, World& world) {
 class App : public Application {
 public:
     void OnInit() override {
-        {
+        m_world.AddSystem(TRANSFORM | MOTION | PATH, PhysicsSystem);
+        m_world.AddSystem(TRANSFORM, CollisionSystem);
+        m_world.AddSystem(RENDERABLE | TRANSFORM | PATH, RenderSystem);
+
+        for (int i = 0; i < 100; i++) {
             EntityData* entity = m_world.CreateEntity(TRANSFORM | MOTION | PATH | RENDERABLE);
 
-            entity->transform.position = { 1280 / 2, 720 / 2 };
-            entity->transform.size = { 32, 32 };
+            entity->transform.position.x = (rand() % 1200) + 40;
+            entity->transform.position.y = (rand() % 640) + 40;
+
+            entity->transform.size.x = 32;
+            entity->transform.size.y = 32;
+
+            entity->motion.velocity.x = (rand() % 2 * 75) - 75;
+            entity->motion.velocity.y = (rand() % 2 * 75) - 75;
 
             entity->color = { 0, 0, 255, 255 };
-        }
-
-        {
-            EntityData* entity = m_world.CreateEntity(TRANSFORM | MOTION | PATH | RENDERABLE);
-
-            entity->transform.position = { 300, 200 };
-            entity->transform.size = { 32, 32 };
-
-            entity->color = { 128, 0, 255, 255 };
         }
     }
 
@@ -188,8 +231,7 @@ public:
             m_lastMousePos = mousePos;
         }
 
-        UpdateEntityPhysics(m_world, timeStep);
-        RenderWorld(m_renderer, m_world);
+        m_world.RunSystems();
     }
 private:
     Uint64 m_lastTime = 0;
