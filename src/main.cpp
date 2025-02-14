@@ -186,7 +186,8 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
             transform.size.y,
         };
 
-        Renderer2D::DrawRect(transform.position, transform.size, { 0, 0, 1, 1 });
+        //Renderer2D::DrawRect(transform.position, transform.size, { 0, 0, 1, 1 });
+        Renderer2D::DrawTexture(texture, transform.position, transform.size, { 1, 1, 1, 1});
     }
 }
 
