@@ -5,11 +5,11 @@
 
 #include <string.h>
 
-template<typename T, size_t Capacity>
+template<typename T, size_t Cap>
 class List {
 public:
     void Push(const T& item) {
-        ASSERT(m_size < Capacity);
+        ASSERT(m_size < Cap);
         m_data[m_size] = item;
         m_size += 1;
     }
@@ -44,8 +44,12 @@ public:
         return m_size;
     }
 
+    size_t Capacity() const {
+        return Cap;
+    }
+
     bool Full() const {
-        return m_size == Capacity;
+        return m_size == Cap;
     }
 
     bool Empty() const {
@@ -63,7 +67,7 @@ public:
     }
 private:
     size_t m_size      = 0;
-    T m_data[Capacity] = {};
+    T m_data[Cap] = {};
 };
 
 #endif

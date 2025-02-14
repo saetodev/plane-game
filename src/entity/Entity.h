@@ -1,6 +1,8 @@
 #ifndef ENTITY_H
 #define ENTITY_H
 
+#include "core/Renderer2D.h"
+
 #include "LinearMath.h"
 #include "List.h"
 
@@ -11,7 +13,7 @@ using EntityID = u64;
 
 enum EntityFlags {
     TRANSFORM  = 1 << 0,
-    RENDERABLE = 1 << 1,
+    SPRITE = 1 << 1,
     MOTION     = 1 << 2,
     PATH       = 1 << 3,
 };
@@ -19,6 +21,7 @@ enum EntityFlags {
 struct Transform {
     Vec2 position;
     Vec2 size;
+    f32 rotation;
 };
 
 struct Motion {
@@ -38,7 +41,7 @@ struct EntityData {
 
     Transform transform;
     Motion motion;
-    Color color;
+    Texture2D texture;
     List<Vec2, MAX_PATH_SIZE> path;
 };
 

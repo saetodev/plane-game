@@ -1,8 +1,16 @@
 #include "core/Application.h"
+#include "core/Renderer2D.h"
 #include "entity/Entity.h"
 #include "entity/World.h"
 
 #include <random>
+
+#include <SDL2/SDL.h>
+
+#define PI 3.14159265359f
+
+#define RAD_TO_DEG (180.0f / PI)
+#define DEG_TO_RAD (PI / 180.0f)
 
 struct Rect {
     Vec2 position;
@@ -73,10 +81,13 @@ void MoveEntityAlongPath(Transform& transform, Motion& motion, List<Vec2, MAX_PA
         moveVector = targetPoint - transform.position;
     }
 
-    motion.velocity = moveVector.Normalized() * 75;
+    Vec2 direction = moveVector.Normalized();
+
+    motion.velocity = direction * 75;
+    transform.rotation = atan2f(direction.y, direction.x) * RAD_TO_DEG;
 }
 
-void RenderPath(SDL_Renderer* renderer, const List<Vec2, MAX_PATH_SIZE>& path) {
+void RenderPath(const List<Vec2, MAX_PATH_SIZE>& path) {
     if (path.Size() < 2) {
         return;
     }
@@ -85,13 +96,11 @@ void RenderPath(SDL_Renderer* renderer, const List<Vec2, MAX_PATH_SIZE>& path) {
         Vec2 start = path[i];
         Vec2 end = path[i + 1];
 
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        SDL_RenderDrawLine(renderer, start.x, start.y, end.x, end.y);
     }
 }
 
 void PhysicsSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
-    const TimeStep& timeStep = Application::Instance()->FrameTime();
+    const TimeStep& timeStep = Application::FrameTime();
 
     for (int i = 0; i < entities.Size(); i++) {
         EntityData* entity = world->GetEntityData(entities[i]);
@@ -116,10 +125,16 @@ void PhysicsSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
 
         if (x0 <= 0 || x1 >= 1280) {
             motion.velocity.x = -motion.velocity.x;
+
+            Vec2 direction = motion.velocity.Normalized();
+            transform.rotation = atan2f(direction.y, direction.x) * RAD_TO_DEG;
         }
 
         if (y0 <= 0 || y1 >= 720) {
             motion.velocity.y = -motion.velocity.y;
+
+            Vec2 direction = motion.velocity.Normalized();
+            transform.rotation = atan2f(direction.y, direction.x) * RAD_TO_DEG;
         }
     }
 }
@@ -149,8 +164,8 @@ void CollisionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
 }
 
 void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
-    SDL_Renderer* renderer = Application::Instance()->Renderer();
-
+    Renderer2D::Clear({ 0, 0, 0, 1 });
+    
     for (int i = 0; i < entities.Size(); i++) {
         EntityData* entity = world->GetEntityData(entities[i]);
 
@@ -160,9 +175,9 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
 
         const Transform& transform = entity->transform;
         const List<Vec2, MAX_PATH_SIZE>& path = entity->path;
-        const Color& color = entity->color;
+        const Texture2D& texture = entity->texture;
 
-        RenderPath(renderer, path);
+        RenderPath(path);
 
         SDL_FRect rect = {
             transform.position.x - (transform.size.x / 2.0f),
@@ -171,80 +186,79 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
             transform.size.y,
         };
 
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRectF(renderer, &rect);
+        Renderer2D::DrawRect(transform.position, transform.size, { 0, 0, 1, 1 });
     }
 }
 
-class App : public Application {
-public:
-    void OnInit() override {
-        m_world.AddSystem(TRANSFORM | MOTION | PATH, PhysicsSystem);
-        m_world.AddSystem(TRANSFORM, CollisionSystem);
-        m_world.AddSystem(RENDERABLE | TRANSFORM | PATH, RenderSystem);
+Uint64 m_lastTime = 0;
 
-        for (int i = 0; i < 100; i++) {
-            EntityData* entity = m_world.CreateEntity(TRANSFORM | MOTION | PATH | RENDERABLE);
+bool m_canDrawPath = false;
+EntityID m_selectedEntity = 0;
+Vec2 m_lastMousePos;
 
-            entity->transform.position.x = (rand() % 1200) + 40;
-            entity->transform.position.y = (rand() % 640) + 40;
+Texture2D m_texture;
 
-            entity->transform.size.x = 32;
-            entity->transform.size.y = 32;
+World m_world;
 
-            entity->motion.velocity.x = (rand() % 2 * 75) - 75;
-            entity->motion.velocity.y = (rand() % 2 * 75) - 75;
+void OnInit() {
+    m_texture = Renderer2D::LoadTexture("data/kenney_pixel-shmup/Ships/ship_0000.png");
 
-            entity->color = { 0, 0, 255, 255 };
+    m_world.AddSystem(TRANSFORM | MOTION | PATH, PhysicsSystem);
+    m_world.AddSystem(TRANSFORM, CollisionSystem);
+    m_world.AddSystem(TRANSFORM | SPRITE | PATH, RenderSystem);
+
+    {
+        EntityData* entity = m_world.CreateEntity(TRANSFORM | MOTION | SPRITE | PATH);
+
+        entity->transform.position.x = 1280 / 2.0f;
+        entity->transform.position.y = 720 / 2.0f;
+
+        entity->transform.size.x = 64;
+        entity->transform.size.y = 64;
+
+        entity->texture = m_texture;
+    }
+}
+
+void OnUpdate(const TimeStep& timeStep) {
+    int mouseX, mouseY;
+    int mouseState = SDL_GetMouseState(&mouseX, &mouseY);
+
+    Vec2 mousePos = { (float)mouseX, (float)mouseY };
+
+    if ((mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && !m_canDrawPath) {
+        m_selectedEntity = EntityAtPosition(m_world, mousePos);
+
+        if (m_selectedEntity != 0) {
+            EntityData* entity = m_world.GetEntityData(m_selectedEntity);
+
+            m_canDrawPath = true;
+            entity->path.Clear();
         }
     }
-
-    void OnUpdate(TimeStep timeStep) override {
-        int mouseX, mouseY;
-        int mouseState = SDL_GetMouseState(&mouseX, &mouseY);
-
-        Vec2 mousePos = { (float)mouseX, (float)mouseY };
-
-        if ((mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && !m_canDrawPath) {
-            m_selectedEntity = EntityAtPosition(m_world, mousePos);
-
-            if (m_selectedEntity != 0) {
-                EntityData* entity = m_world.GetEntityData(m_selectedEntity);
-
-                m_canDrawPath = true;
-                entity->path.Clear();
-            }
-        }
-        else if (!(mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && m_canDrawPath) {
-            m_canDrawPath = false;
-            m_selectedEntity = 0;
-        }
-
-        if (m_canDrawPath) {
-            if (mousePos != m_lastMousePos) {
-                EntityData* entity = m_world.GetEntityData(m_selectedEntity);
-                if (!entity->path.Full()) {
-                    entity->path.Push(mousePos);
-                }
-            }
-
-            m_lastMousePos = mousePos;
-        }
-
-        m_world.RunSystems();
+    else if (!(mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && m_canDrawPath) {
+        m_canDrawPath = false;
+        m_selectedEntity = 0;
     }
-private:
-    Uint64 m_lastTime = 0;
 
-    bool m_canDrawPath = false;
-    EntityID m_selectedEntity = 0;
-    Vec2 m_lastMousePos;
+    if (m_canDrawPath) {
+        if (mousePos != m_lastMousePos) {
+            EntityData* entity = m_world.GetEntityData(m_selectedEntity);
+            if (!entity->path.Full()) {
+                entity->path.Push(mousePos);
+            }
+        }
 
-    World m_world;
-};
+        m_lastMousePos = mousePos;
+    }
+
+    m_world.RunSystems();
+}
 
 int main(int argc, char** argv) {
-    (new App())->Run();
+    Application::Init();
+    Application::Run(OnInit, OnUpdate);
+    Application::Shutdown();
 
     return 0;
 }

@@ -1,23 +1,8 @@
+#include "core/Util.h"
 #include "World.h"
 
-#include <random>
-
-static std::random_device s_randomDevice;
-static std::mt19937_64 s_randomEngine(s_randomDevice());
-static std::uniform_int_distribution<uint64_t> s_uniformDistribution;
-
-static EntityID GenerateEntityID() {
-    EntityID id;
-
-    do {
-        id = s_uniformDistribution(s_randomEngine);
-    } while (id == 0);
-
-    return id;
-}
-
 EntityData* World::CreateEntity(u64 flags) {
-    EntityID id = GenerateEntityID();
+    EntityID id = Util::RandomID();
     size_t index = m_entityData.Size();
 
     ASSERT(!m_entityMap.Contains(id));

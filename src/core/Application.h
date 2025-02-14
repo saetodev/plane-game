@@ -3,7 +3,8 @@
 
 #include "Basic.h"
 
-#include <SDL2/SDL.h>
+#include <functional>
+#include <string>
 
 class TimeStep {
 public:
@@ -23,43 +24,13 @@ private:
     float m_deltaTime = 0;
 };
 
-class Application {
-public:
-    Application() {
-        ASSERT(!m_instance);
-        m_instance = this;
-    }
-
-    void Run();
-
-    virtual void OnInit() = 0;
-    virtual void OnUpdate(TimeStep timeStep) = 0;
-
-    SDL_Renderer* Renderer() const {
-        return m_renderer;
-    }
-
-    const TimeStep& FrameTime() const {
-        return m_timeStep;
-    }
-
-    static Application* Instance() {
-        return m_instance;
-    }
-private:
+namespace Application {
     void Init();
     void Shutdown();
-protected:
-    SDL_Window* m_window = NULL;
-    SDL_Renderer* m_renderer = NULL;
 
-    bool m_running = false;
+    void Run(std::function<void()> onInit, std::function<void(const TimeStep&)> onUpdate);
 
-    TimeStep m_timeStep;
-private:
-    static Application* m_instance;
-};
-
-inline Application* Application::m_instance = NULL;
+    const TimeStep& FrameTime();
+}
 
 #endif
