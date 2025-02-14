@@ -14,16 +14,22 @@ struct Vertex {
     Vec2 textureCoord;
 };
 
-static u32 m_vao;
-static u32 m_vbo;
-static u32 m_shader;
+struct StringRef {
+    usize size;
+    const char* str;
+};
+
+static u32 m_quadVBO;
+static u32 m_quadShader;
+
+static u32 m_lineVBO;
+static u32 m_lineShader;
 
 static Texture2D m_whiteTexture;
 
 static Mat4 m_projection;
 
-#if 1
-static const Vertex m_vertices[] = {
+static const Vertex m_quadVertices[] = {
     { { -0.5f, -0.5f }, { 0, 0 } },
     { {  0.5f, -0.5f }, { 1, 0 } },
     { {  0.5f,  0.5f }, { 1, 1 } },
@@ -32,19 +38,8 @@ static const Vertex m_vertices[] = {
     { { -0.5f,  0.5f }, { 0, 1 } },
     { { -0.5f, -0.5f }, { 0, 0 } },
 };
-#else
-static const Vertex m_vertices[] = {
-    { { -0.5f, -0.5f }, { 1, 0 } },
-    { {  0.5f, -0.5f }, { 0, 0 } },
-    { {  0.5f,  0.5f }, { 0, 1 } },
 
-    { {  0.5f,  0.5f }, { 0, 1 } },
-    { { -0.5f,  0.5f }, { 1, 1 } },
-    { { -0.5f, -0.5f }, { 1, 0 } },
-};
-#endif
-
-static u32 CreateShader(const char* vsSource, const char* fsSource) {
+static u32 CreateShader(const char* vsSource, const char* fsSource, bool quadShader) {
     int result = 0;
     u32 shader = glCreateProgram();
 
@@ -77,8 +72,13 @@ static u32 CreateShader(const char* vsSource, const char* fsSource) {
     glAttachShader(shader, vertexShader);
     glAttachShader(shader, fragmentShader);
 
-    glBindAttribLocation(shader, 0, "a_position");
-    glBindAttribLocation(shader, 1, "a_textureCoord");
+    if (quadShader) {
+        glBindAttribLocation(shader, 0, "a_position");
+        glBindAttribLocation(shader, 1, "a_textureCoord");
+    } 
+    else {
+        glBindAttribLocation(shader, 0, "a_position");
+    }
 
     glLinkProgram(shader);
 
@@ -89,27 +89,36 @@ static u32 CreateShader(const char* vsSource, const char* fsSource) {
 }
 
 void Renderer2D::Init() {
-    //glGenVertexArraysOES(1, &m_vao);
-    //glBindVertexArrayOES(m_vao);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glGenBuffers(1, &m_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(m_vertices), m_vertices, GL_STATIC_DRAW);
+    glGenBuffers(1, &m_quadVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(m_quadVertices), m_quadVertices, GL_STATIC_DRAW);
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), (const void*)offsetof(Vertex, position));
+    {
+        char* vsSource = Util::ReadEntireFile("data/vertex.glsl");
+        char* fsSource = Util::ReadEntireFile("data/frag.glsl");
 
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(Vertex), (const void*)offsetof(Vertex, textureCoord));
+        m_quadShader = CreateShader(vsSource, fsSource, true);
 
-    char* vsSource = Util::ReadEntireFile("data/vertex.glsl");
-    char* fsSource = Util::ReadEntireFile("data/frag.glsl");
+        free(fsSource);
+        free(vsSource);
+    }
 
-    m_shader = CreateShader(vsSource, fsSource);
-    glUseProgram(m_shader);
+    glGenBuffers(1, &m_lineVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_lineVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vec2) * 2, NULL, GL_DYNAMIC_DRAW);
 
-    free(fsSource);
-    free(vsSource);
+    {
+        char* vsSource = Util::ReadEntireFile("data/line_vertex.glsl");
+        char* fsSource = Util::ReadEntireFile("data/line_frag.glsl");
+
+        m_lineShader = CreateShader(vsSource, fsSource, false);
+
+        free(fsSource);
+        free(vsSource);
+    }
 
     u32 whitePixels[] = { 0xFFFFFFFF };
     m_whiteTexture = CreateTexture(1, 1, whitePixels);
@@ -118,8 +127,11 @@ void Renderer2D::Init() {
 }
 
 void Renderer2D::Shutdown() {
-    glDeleteBuffers(1, &m_vbo);
-    //glDeleteVertexArraysOES(1, &m_vao);
+    glDeleteShader(m_lineShader);
+    glDeleteShader(m_quadShader);
+
+    glDeleteBuffers(1, &m_lineVBO);
+    glDeleteBuffers(1, &m_quadVBO);
 }
 
 Texture2D Renderer2D::LoadTexture(const char* filename) {
@@ -160,20 +172,69 @@ void Renderer2D::Clear(const Vec4& color) {
     glClear(GL_COLOR_BUFFER_BIT);
 }
 
-void Renderer2D::DrawRect(const Vec2& position, const Vec2& size, const Vec4& color) {
-    int transformLoc  = glGetUniformLocation(m_shader, "u_transform");
-    int projectionLoc = glGetUniformLocation(m_shader, "u_projection");
-    int colorLoc = glGetUniformLocation(m_shader, "u_color");
-    int textureLoc = glGetUniformLocation(m_shader, "u_texture");
+void Renderer2D::DrawLine(const Vec2& start, const Vec2& end, const Vec4& color) {
+    glBindBuffer(GL_ARRAY_BUFFER, m_lineVBO);
+    glUseProgram(m_lineShader);
 
-    Mat4 transform = {
-        .r0 = { size.x, 0.0f,   0.0f, position.x },
-        .r1 = { 0.0f,   size.y, 0.0f, position.y },
-        .r2 = { 0.0f,   0.0f,   1.0f, 0.0f },
-        .r3 = { 0.0f,   0.0f,   0.0f, 1.0f },
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, NULL);
+
+    int projectionLoc = glGetUniformLocation(m_lineShader, "u_projection");
+    int colorLoc = glGetUniformLocation(m_lineShader, "u_color");
+
+    glUniformMatrix4fv(projectionLoc, 1, true, (float*)&m_projection);
+    glUniform4fv(colorLoc, 1, (float*)&color);
+
+    Vec2 vertices[] = { start, end };
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+
+    glDrawArrays(GL_LINES, 0, 2);
+}
+
+void Renderer2D::DrawRect(const Vec2& position, const Vec2& size, const Vec4& color) {
+    DrawRect({ position, size }, color);
+}
+
+void Renderer2D::DrawRect(const Transform& transform, const Vec4& color) {
+    glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO);
+    glUseProgram(m_quadShader);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), (const void*)offsetof(Vertex, position));
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(Vertex), (const void*)offsetof(Vertex, textureCoord));
+    
+    int transformLoc  = glGetUniformLocation(m_quadShader, "u_transform");
+    int projectionLoc = glGetUniformLocation(m_quadShader, "u_projection");
+    int colorLoc = glGetUniformLocation(m_quadShader, "u_color");
+    int textureLoc = glGetUniformLocation(m_quadShader, "u_texture");
+
+    f32 tx = transform.position.x;
+    f32 ty = transform.position.y;
+
+    f32 sx = transform.size.x;
+    f32 sy = transform.size.y;
+
+    f32 rotation = transform.rotation * DEG_TO_RAD;
+
+    Mat4 rotMatrix = {
+        .r0 = { cosf(rotation), -sinf(rotation), 0.0f, 0.0f },
+        .r1 = { sinf(rotation),  cosf(rotation), 0.0f, 0.0f },
+        .r2 = { 0.0f,            0.0f,           1.0f, 0.0f },
+        .r3 = { 0.0f,            0.0f,           0.0f, 1.0f },
     };
 
-    glUniformMatrix4fv(transformLoc, 1, true, (float*)&transform);
+    Mat4 transformMatrix = {
+        .r0 = { sx,   0.0f, 0.0f, tx },
+        .r1 = { 0.0f, sy,   0.0f, ty },
+        .r2 = { 0.0f, 0.0f, 1.0f, 0.0f },
+        .r3 = { 0.0f, 0.0f, 0.0f, 1.0f },
+    };
+
+    transformMatrix = transformMatrix * rotMatrix;
+
+    glUniformMatrix4fv(transformLoc, 1, true, (float*)&transformMatrix);
     glUniformMatrix4fv(projectionLoc, 1, true, (float*)&m_projection);
     glUniform4fv(colorLoc, 1, (float*)&color);
 
@@ -185,19 +246,49 @@ void Renderer2D::DrawRect(const Vec2& position, const Vec2& size, const Vec4& co
 }
 
 void Renderer2D::DrawTexture(const Texture2D& texture, const Vec2& position, const Vec2& size, const Vec4& color) {
-    int transformLoc  = glGetUniformLocation(m_shader, "u_transform");
-    int projectionLoc = glGetUniformLocation(m_shader, "u_projection");
-    int colorLoc = glGetUniformLocation(m_shader, "u_color");
-    int textureLoc = glGetUniformLocation(m_shader, "u_texture");
+    DrawTexture(texture, { position, size }, color);
+}
 
-    Mat4 transform = {
-        .r0 = { size.x, 0.0f,   0.0f, position.x },
-        .r1 = { 0.0f,   size.y, 0.0f, position.y },
-        .r2 = { 0.0f,   0.0f,   1.0f, 0.0f },
-        .r3 = { 0.0f,   0.0f,   0.0f, 1.0f },
+void Renderer2D::DrawTexture(const Texture2D& texture, const Transform& transform, const Vec4& color) {
+    glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO);
+    glUseProgram(m_quadShader);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), (const void*)offsetof(Vertex, position));
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(Vertex), (const void*)offsetof(Vertex, textureCoord));
+    
+    int transformLoc  = glGetUniformLocation(m_quadShader, "u_transform");
+    int projectionLoc = glGetUniformLocation(m_quadShader, "u_projection");
+    int colorLoc = glGetUniformLocation(m_quadShader, "u_color");
+    int textureLoc = glGetUniformLocation(m_quadShader, "u_texture");
+
+    f32 tx = transform.position.x;
+    f32 ty = transform.position.y;
+
+    f32 sx = transform.size.x;
+    f32 sy = transform.size.y;
+
+    f32 rotation = transform.rotation * DEG_TO_RAD;
+
+    Mat4 rotMatrix = {
+        .r0 = { cosf(rotation), -sinf(rotation), 0.0f, 0.0f },
+        .r1 = { sinf(rotation),  cosf(rotation), 0.0f, 0.0f },
+        .r2 = { 0.0f,            0.0f,           1.0f, 0.0f },
+        .r3 = { 0.0f,            0.0f,           0.0f, 1.0f },
     };
 
-    glUniformMatrix4fv(transformLoc, 1, true, (float*)&transform);
+    Mat4 transformMatrix = {
+        .r0 = { sx,   0.0f, 0.0f, tx },
+        .r1 = { 0.0f, sy,   0.0f, ty },
+        .r2 = { 0.0f, 0.0f, 1.0f, 0.0f },
+        .r3 = { 0.0f, 0.0f, 0.0f, 1.0f },
+    };
+
+    transformMatrix = transformMatrix * rotMatrix;
+
+    glUniformMatrix4fv(transformLoc, 1, true, (float*)&transformMatrix);
     glUniformMatrix4fv(projectionLoc, 1, true, (float*)&m_projection);
     glUniform4fv(colorLoc, 1, (float*)&color);
 

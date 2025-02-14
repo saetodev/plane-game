@@ -7,11 +7,6 @@
 
 #include <SDL2/SDL.h>
 
-#define PI 3.14159265359f
-
-#define RAD_TO_DEG (180.0f / PI)
-#define DEG_TO_RAD (PI / 180.0f)
-
 struct Rect {
     Vec2 position;
     Vec2 size;
@@ -96,6 +91,7 @@ void RenderPath(const List<Vec2, MAX_PATH_SIZE>& path) {
         Vec2 start = path[i];
         Vec2 end = path[i + 1];
 
+        Renderer2D::DrawLine(start, end, { 1, 0, 0, 1 });
     }
 }
 
@@ -164,7 +160,7 @@ void CollisionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
 }
 
 void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
-    Renderer2D::Clear({ 0, 0, 0, 1 });
+    Renderer2D::Clear({ 0.25f, 0.25f, 0.25f, 1.0f });
     
     for (int i = 0; i < entities.Size(); i++) {
         EntityData* entity = world->GetEntityData(entities[i]);
@@ -186,8 +182,7 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
             transform.size.y,
         };
 
-        //Renderer2D::DrawRect(transform.position, transform.size, { 0, 0, 1, 1 });
-        Renderer2D::DrawTexture(texture, transform.position, transform.size, { 1, 1, 1, 1});
+        Renderer2D::DrawTexture(texture, { transform.position, transform.size, transform.rotation + 90 }, { 1, 1, 1, 1});
     }
 }
 

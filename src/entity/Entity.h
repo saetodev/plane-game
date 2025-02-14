@@ -18,12 +18,6 @@ enum EntityFlags {
     PATH       = 1 << 3,
 };
 
-struct Transform {
-    Vec2 position;
-    Vec2 size;
-    f32 rotation;
-};
-
 struct Motion {
     Vec2 velocity;
 };

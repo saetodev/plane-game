@@ -5,12 +5,21 @@
 
 #include <math.h>
 
+#define PI 3.14159265359f
+
+#define RAD_TO_DEG (180.0f / PI)
+#define DEG_TO_RAD (PI / 180.0f)
+
 struct Vec2 {
     f32 x = 0.0f;
     f32 y = 0.0f;
 
     f32 Length() {
         return sqrtf((x * x) + (y * y));
+    }
+
+    f32 Dot(const Vec2& v) {
+        return (x * v.x) + (y * v.y);
     }
 
     Vec2 Normalized() {
@@ -42,17 +51,27 @@ inline Vec2 operator*(const Vec2& v, f32 s) {
     return { v.x * s, v.y * s };
 }
 
+struct Transform {
+    Vec2 position;
+    Vec2 size;
+    f32 rotation;
+};
+
 struct Vec4 {
     f32 x = 0.0f;
     f32 y = 0.0f;
     f32 z = 0.0f;
     f32 w = 0.0f;
 
-    f32 Length() {
+    f32 Length() const {
         return sqrtf((x * x) + (y * y) + (z * z) + (w * w));
     }
 
-    Vec4 Normalized() {
+    f32 Dot(const Vec4& v) const {
+        return (x * v.x) + (y * v.y) + (z * v.z) + (w * v.w);
+    }
+
+    Vec4 Normalized() const {
         f32 len = Length();
 
         if (len == 0) {
@@ -89,7 +108,7 @@ struct Mat4 {
     Vec4 r2;
     Vec4 r3;
 
-    Mat4 Transposed() {
+    Mat4 Transposed() const {
         return {
             .r0 = { r0.x, r1.x, r2.x, r3.x },
             .r1 = { r0.y, r1.y, r2.y, r3.y },
@@ -98,6 +117,17 @@ struct Mat4 {
         };
     }
 };
+
+inline Mat4 operator*(const Mat4& a, const Mat4& b) {
+    Mat4 bT = b.Transposed();
+
+    return {
+        .r0 = { a.r0.Dot(bT.r0), a.r0.Dot(bT.r1), a.r0.Dot(bT.r2), a.r0.Dot(bT.r3) },
+        .r1 = { a.r1.Dot(bT.r0), a.r1.Dot(bT.r1), a.r1.Dot(bT.r2), a.r1.Dot(bT.r3) },
+        .r2 = { a.r2.Dot(bT.r0), a.r2.Dot(bT.r1), a.r2.Dot(bT.r2), a.r2.Dot(bT.r3) },
+        .r3 = { a.r3.Dot(bT.r0), a.r3.Dot(bT.r1), a.r3.Dot(bT.r2), a.r3.Dot(bT.r3) },
+    };
+}
 
 inline Mat4 OrthoProjection(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
     f32 sx = 2.0f / (right - left);

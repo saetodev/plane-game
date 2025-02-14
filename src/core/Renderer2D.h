@@ -18,8 +18,13 @@ namespace Renderer2D {
 
     void Clear(const Vec4& color);
 
+    void DrawLine(const Vec2& start, const Vec2& end, const Vec4& color);
+    
     void DrawRect(const Vec2& position, const Vec2& size, const Vec4& color);
+    void DrawRect(const Transform& transform, const Vec4& color);
+
     void DrawTexture(const Texture2D& texture, const Vec2& position, const Vec2& size, const Vec4& color);
+    void DrawTexture(const Texture2D& texture, const Transform& transform, const Vec4& color);
 }
 
 #endif
