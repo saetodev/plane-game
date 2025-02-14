@@ -1,6 +1,8 @@
 #ifndef LINEAR_MATH_H
 #define LINEAR_MATH_H
 
+#include "Basic.h"
+
 #include <math.h>
 
 struct Vec2 {
