@@ -22,6 +22,9 @@ namespace Renderer2D {
     Texture2D LoadTexture(const char* filename);
     Texture2D CreateTexture(u32 width, u32 height, void* pixels);
 
+    void Begin();
+    void End();
+
     void Clear(const Vec4& color);
 
     void DrawLine(const Vec2& start, const Vec2& end, const Vec4& color);

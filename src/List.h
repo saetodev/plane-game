@@ -56,6 +56,10 @@ public:
         return m_size == 0;
     }
 
+    const T* Data() const {
+        return m_data;
+    }
+
     T& operator[](size_t index) {
         ASSERT(index >= 0 && index < m_size);
         return m_data[index];

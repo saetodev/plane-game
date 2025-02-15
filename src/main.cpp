@@ -214,7 +214,7 @@ Texture2D m_texture;
 
 World m_world;
 
-int m_tileSize = 32;
+int m_tileSize = 8;
 List<Vec2, MAX_PATH_SIZE> m_path;
 
 int m_lastTileX = 0;
@@ -277,6 +277,8 @@ void OnUpdate(const TimeStep& timeStep) {
         m_lastMousePos = mousePos;
     }
 #endif
+    Renderer2D::Begin();
+
     Vec2 mousePos = Application::MousePos();
 
     if (Application::MousePressed(SDL_BUTTON_LEFT)) {
@@ -319,8 +321,10 @@ void OnUpdate(const TimeStep& timeStep) {
 
     // draw path points
     for (int i = 0; i < m_path.Size(); i++) {
-        Renderer2D::DrawRect(m_path[i], { 8, 8 }, WHITE);
+        Renderer2D::DrawRect(m_path[i], { (f32) m_tileSize / 4, (f32)m_tileSize / 4 }, WHITE);
     }
+
+    Renderer2D::End();
 }
 
 int main(int argc, char** argv) {

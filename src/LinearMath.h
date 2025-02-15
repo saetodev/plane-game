@@ -149,6 +149,15 @@ struct Mat4 {
     }
 };
 
+inline Vec4 operator*(const Mat4& m, const Vec4& v) {
+    return {
+        .x = m.r0.Dot(v),
+        .y = m.r1.Dot(v),
+        .z = m.r2.Dot(v),
+        .w = m.r3.Dot(v),
+    };
+}
+
 inline Mat4 operator*(const Mat4& a, const Mat4& b) {
     Mat4 bT = b.Transposed();
 
