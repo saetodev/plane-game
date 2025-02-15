@@ -1,7 +1,7 @@
 #ifndef CORE_APPLICATION_H
 #define CORE_APPLICATION_H
 
-#include "Basic.h"
+#include "LinearMath.h"
 
 #include <functional>
 #include <string>
@@ -24,13 +24,35 @@ private:
     float m_deltaTime = 0;
 };
 
+typedef std::function<void()> AppInitCB;
+typedef std::function<void(const TimeStep&)> AppUpdateCB;
+
+struct AppDesc {
+    int windowWidth;
+    int windowHeight;
+    std::string windowTitle;
+};
+
 namespace Application {
-    void Init();
+    void Init(const AppDesc& desc);
     void Shutdown();
 
-    void Run(std::function<void()> onInit, std::function<void(const TimeStep&)> onUpdate);
+    void Run(AppInitCB onInit, AppUpdateCB onUpdate);
 
     const TimeStep& FrameTime();
+
+    bool KeyDown(int key);
+    bool KeyPressed(int key);
+    bool KeyReleased(int key);
+
+    bool MouseDown(int button);
+    bool MousePressed(int button);
+    bool MouseReleased(int button);
+
+    Vec2 MousePos();
+
+    Vec2 WindowSize();
+    void SetWindowTitle(const std::string& title);
 }
 
 #endif

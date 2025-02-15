@@ -3,7 +3,7 @@
 
 #include "Basic.h"
 
-#include <xhash>
+#include <memory>
 
 template<typename K, typename V>
 struct MapEntry {

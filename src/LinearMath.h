@@ -14,15 +14,15 @@ struct Vec2 {
     f32 x = 0.0f;
     f32 y = 0.0f;
 
-    f32 Length() {
+    f32 Length() const {
         return sqrtf((x * x) + (y * y));
     }
 
-    f32 Dot(const Vec2& v) {
+    f32 Dot(const Vec2& v) const {
         return (x * v.x) + (y * v.y);
     }
 
-    Vec2 Normalized() {
+    Vec2 Normalized() const {
         f32 len = Length();
 
         if (len == 0) {
@@ -31,10 +31,41 @@ struct Vec2 {
 
         return { x / len, y / len };
     }
+
+    f32 Angle() const {
+        if (Length() == 0) {
+            return 0;
+        }
+
+        return atan2f(y, x);
+    }
+
+    f32 AngleInDeg() const {
+        if (Length() == 0) {
+            return 0;
+        }
+        
+        return atan2f(y, x) * RAD_TO_DEG;
+    }
+
+    f32 AngleBetween(const Vec2& v) const {
+        f32 aLen = Length();
+        f32 vLen = v.Length();
+
+        if (aLen == 0 || vLen == 0) {
+            return 0;
+        }
+
+        return Dot(v) / (Length() * v.Length());
+    }
 };
 
 inline bool operator==(const Vec2& a, const Vec2& b) {
     return (a.x == b.x) && (a.y == b.y);
+}
+
+inline Vec2 operator+(const Vec2& a, const Vec2& b) {
+    return { a.x + b.x, a.y + b.y };
 }
 
 inline Vec2& operator+=(Vec2& a, const Vec2& b) {

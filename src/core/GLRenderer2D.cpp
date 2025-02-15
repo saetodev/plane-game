@@ -245,6 +245,19 @@ void Renderer2D::DrawRect(const Transform& transform, const Vec4& color) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
+void Renderer2D::DrawRectLines(const Vec2& position, const Vec2& size, const Vec4& color) {
+    f32 x0 = position.x - (size.x / 2.0f);
+    f32 y0 = position.y - (size.y / 2.0f);
+
+    f32 x1 = x0 + size.x;
+    f32 y1 = y0 + size.y;
+
+    DrawLine({ x0, y0 }, { x1, y0 }, color); // top
+    DrawLine({ x1, y0 }, { x1, y1 }, color); // right
+    DrawLine({ x0, y1 }, { x1, y1 }, color); // bottom
+    DrawLine({ x0, y0 }, { x0, y1 }, color); // left
+}
+
 void Renderer2D::DrawTexture(const Texture2D& texture, const Vec2& position, const Vec2& size, const Vec4& color) {
     DrawTexture(texture, { position, size }, color);
 }

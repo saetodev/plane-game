@@ -2,7 +2,6 @@
 #define ENTITY_H
 
 #include "core/Renderer2D.h"
-
 #include "LinearMath.h"
 #include "List.h"
 
@@ -13,13 +12,17 @@ using EntityID = u64;
 
 enum EntityFlags {
     TRANSFORM  = 1 << 0,
-    SPRITE = 1 << 1,
+    SPRITE     = 1 << 1,
     MOTION     = 1 << 2,
     PATH       = 1 << 3,
 };
 
 struct Motion {
     Vec2 velocity;
+    Vec2 acceleration;
+
+    f32 angularVelocity;
+    f32 angularAcceleration;
 };
 
 struct Color {

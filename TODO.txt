@@ -1,0 +1,12 @@
+# TODO
+
+## Game
+[-] Draw simple paths in a grid
+[-] Path smoothing
+
+## App
+[-] Implement input actions
+
+## Renderer2D
+[-] Implement batch renderer
+[-] Implement font rendering
