@@ -214,7 +214,7 @@ Texture2D m_texture;
 
 World m_world;
 
-int m_tileSize = 8;
+int m_tileSize = 32;
 List<Vec2, MAX_PATH_SIZE> m_path;
 
 int m_lastTileX = 0;

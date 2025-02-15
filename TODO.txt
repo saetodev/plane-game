@@ -1,12 +1,13 @@
 # TODO
 
 ## Game
-[-] Draw simple paths in a grid
+[X] Draw simple paths in a grid
 [-] Path smoothing
+[-] Move entities along path
 
 ## App
 [-] Implement input actions
 
 ## Renderer2D
-[-] Implement batch renderer
+[X] Implement batch renderer
 [-] Implement font rendering
