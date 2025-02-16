@@ -1,8 +1,8 @@
 #include "Util.h"
 
+#include <fstream>
 #include <random>
-#include <stdlib.h>
-#include <stdio.h>
+#include <sstream>
 
 // random numbers
 static std::random_device s_randomDevice;
@@ -19,23 +19,15 @@ u64 Util::RandomID() {
     return id;
 }
 
-char* Util::ReadEntireFile(const char* filename) {
-    FILE* file = fopen(filename, "rb");
+std::string Util::ReadEntireFile(const std::string& filename) {
+    std::string line;
+    std::fstream file(filename);
 
-    if (!file) {
-        //TODO: log this
-        return NULL;
+    std::stringstream stream;
+
+    while (std::getline(file, line)) {
+        stream << line << "\n";
     }
 
-    fseek(file, 0, SEEK_END);
-    usize size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char* buffer = (char*)malloc(size + 1);
-    buffer[size] = '\0';
-
-    fread(buffer, sizeof(char), size, file);
-    fclose(file);
-
-    return buffer;
+    return stream.str();
 }

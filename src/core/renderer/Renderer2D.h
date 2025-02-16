@@ -2,6 +2,7 @@
 #define CORE_RENDERER_H
 
 #include "LinearMath.h"
+#include "Texture.h"
 
 inline constexpr Vec4 WHITE = { 1, 1, 1, 1};
 inline constexpr Vec4 BLACK = { 0, 0, 0, 1};
@@ -9,18 +10,9 @@ inline constexpr Vec4 RED   = { 1, 0, 0, 1};
 inline constexpr Vec4 GREEN = { 0, 1, 0, 1};
 inline constexpr Vec4 BLUE  = { 0, 0, 1, 1};
 
-struct Texture2D {
-    u32 id;
-    u32 width;
-    u32 height;
-};
-
 namespace Renderer2D {
     void Init();
     void Shutdown();
-
-    Texture2D LoadTexture(const char* filename);
-    Texture2D CreateTexture(u32 width, u32 height, void* pixels);
 
     void Begin();
     void End();

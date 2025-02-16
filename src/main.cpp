@@ -1,5 +1,6 @@
 #include "core/Application.h"
-#include "core/Renderer2D.h"
+#include "core/renderer/Renderer2D.h"
+#include "core/renderer/Texture.h"
 #include "entity/Entity.h"
 #include "entity/World.h"
 

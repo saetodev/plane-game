@@ -1,7 +1,7 @@
 #ifndef ENTITY_H
 #define ENTITY_H
 
-#include "core/Renderer2D.h"
+#include "core/renderer/Texture.h"
 #include "LinearMath.h"
 #include "List.h"
 

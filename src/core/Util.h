@@ -3,9 +3,11 @@
 
 #include "Basic.h"
 
+#include <string>
+
 namespace Util {
     u64 RandomID();
-    char* ReadEntireFile(const char* filename);
+    std::string ReadEntireFile(const std::string& filename);
 }
 
 #endif
