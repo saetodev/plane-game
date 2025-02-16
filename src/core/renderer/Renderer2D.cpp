@@ -48,6 +48,24 @@ static void DrawBuffer(const Buffer& buffer, u32 type, usize count) {
     glDrawArrays(type, 0, count);
 }
 
+static int GetTextureSlot(const Texture2D& texture) {
+    int index = -1;
+
+    for (int i = 0; i < m_textureSlots.Size(); i++) {
+        if (m_textureSlots[i].renderID == texture.renderID) {
+            index = i;
+            break;
+        }
+    }
+
+    if (index == -1) {
+        index = m_textureSlots.Size();
+        m_textureSlots.Push(texture);
+    }
+
+    return index;
+}
+
 static void Flush() {
     if (!m_quadVertexBuffer.Empty()) {
         UseShader(m_quadShader);
@@ -176,30 +194,6 @@ void Renderer2D::DrawTexture(const Texture2D& texture, const Transform& transfor
         Flush();
     }
 
-    f32 tx = transform.position.x;
-    f32 ty = transform.position.y;
-
-    f32 sx = transform.size.x;
-    f32 sy = transform.size.y;
-
-    f32 rotation = transform.rotation * DEG_TO_RAD;
-
-    Mat4 rotMatrix = {
-        .r0 = { cosf(rotation), -sinf(rotation), 0.0f, 0.0f },
-        .r1 = { sinf(rotation),  cosf(rotation), 0.0f, 0.0f },
-        .r2 = { 0.0f,            0.0f,           1.0f, 0.0f },
-        .r3 = { 0.0f,            0.0f,           0.0f, 1.0f },
-    };
-
-    Mat4 transformMatrix = {
-        .r0 = { sx,   0.0f, 0.0f, tx },
-        .r1 = { 0.0f, sy,   0.0f, ty },
-        .r2 = { 0.0f, 0.0f, 1.0f, 0.0f },
-        .r3 = { 0.0f, 0.0f, 0.0f, 1.0f },
-    };
-
-    transformMatrix = transformMatrix * rotMatrix;
-
     static constexpr Vec4 quadVertices[] = {
         { -0.5f, -0.5f, 0.0f, 1.0f },
         {  0.5f, -0.5f, 0.0f, 1.0f },
@@ -220,28 +214,16 @@ void Renderer2D::DrawTexture(const Texture2D& texture, const Transform& transfor
         { 0, 0 },
     };
 
-    int index = -1;
-
-    for (int i = 0; i < m_textureSlots.Size(); i++) {
-        if (m_textureSlots[i].renderID == texture.renderID) {
-            index = i;
-            break;
-        }
-    }
-
-    if (index == -1) {
-        index = m_textureSlots.Size();
-        m_textureSlots.Push(texture);
-    }
+    int textureSlot = GetTextureSlot(texture);
 
     for (int i = 0; i < VERTICES_PER_QUAD; i++) {
-        Vec4 transformVertex = transformMatrix * quadVertices[i];
+        Vec4 transformVertex = transform.Matrix() * quadVertices[i];
 
         QuadVertex vertex = {
             .position     = { transformVertex.x, transformVertex.y },
             .textureCoord = quadTextureCoords[i],
             .color        = color,
-            .textureID    = (f32)texture.renderID,
+            .textureID    = (f32)textureSlot,
         };
 
         m_quadVertexBuffer.Push(vertex);

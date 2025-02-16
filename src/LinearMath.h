@@ -60,6 +60,8 @@ struct Vec2 {
     }
 };
 
+/* VEC2 OPERATORS */
+
 inline bool operator==(const Vec2& a, const Vec2& b) {
     return (a.x == b.x) && (a.y == b.y);
 }
@@ -81,12 +83,6 @@ inline Vec2 operator-(const Vec2& a, const Vec2& b) {
 inline Vec2 operator*(const Vec2& v, f32 s) {
     return { v.x * s, v.y * s };
 }
-
-struct Transform {
-    Vec2 position;
-    Vec2 size;
-    f32 rotation;
-};
 
 struct Vec4 {
     f32 x = 0.0f;
@@ -112,6 +108,8 @@ struct Vec4 {
         return { x / len, y / len, z / len, w / len };
     }
 };
+
+/* VEC4 OPERATORS */
 
 inline bool operator==(const Vec4& a, const Vec4& b) {
     return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);
@@ -149,6 +147,8 @@ struct Mat4 {
     }
 };
 
+/* MAT4 OPERATORS */
+
 inline Vec4 operator*(const Mat4& m, const Vec4& v) {
     return {
         .x = m.r0.Dot(v),
@@ -168,6 +168,36 @@ inline Mat4 operator*(const Mat4& a, const Mat4& b) {
         .r3 = { a.r3.Dot(bT.r0), a.r3.Dot(bT.r1), a.r3.Dot(bT.r2), a.r3.Dot(bT.r3) },
     };
 }
+
+struct Transform {
+    Vec2 position;
+    Vec2 size;
+    f32 rotation;
+
+    Mat4 Matrix() const {
+        f32 tx = position.x;
+        f32 ty = position.y;
+
+        f32 sx = size.x;
+        f32 sy = size.y;
+
+        Mat4 rotMatrix = {
+            .r0 = { cosf(rotation), -sinf(rotation), 0.0f, 0.0f },
+            .r1 = { sinf(rotation),  cosf(rotation), 0.0f, 0.0f },
+            .r2 = { 0.0f,            0.0f,           1.0f, 0.0f },
+            .r3 = { 0.0f,            0.0f,           0.0f, 1.0f },
+        };
+
+        Mat4 transformMatrix = {
+            .r0 = { sx,   0.0f, 0.0f, tx },
+            .r1 = { 0.0f, sy,   0.0f, ty },
+            .r2 = { 0.0f, 0.0f, 1.0f, 0.0f },
+            .r3 = { 0.0f, 0.0f, 0.0f, 1.0f },
+        };
+
+        return transformMatrix * rotMatrix;
+    }
+};
 
 inline Mat4 OrthoProjection(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
     f32 sx = 2.0f / (right - left);

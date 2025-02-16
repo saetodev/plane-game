@@ -198,7 +198,7 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
             transform.size.y,
         };
 
-        Renderer2D::DrawTexture(texture, { transform.position, transform.size, transform.rotation * RAD_TO_DEG + 90 }, WHITE);
+        Renderer2D::DrawTexture(texture, { transform.position, transform.size, transform.rotation + (PI / 2) }, WHITE);
         
         // debug
         {
