@@ -3,6 +3,7 @@
 #include "core/renderer/Texture.h"
 #include "entity/Entity.h"
 #include "entity/World.h"
+#include "game.h"
 
 #include <format>
 #include <iostream>
@@ -47,21 +48,6 @@ Rect GetEntityRect(World& world, EntityID id) {
             entity->transform.size.y,
         },
     };
-}
-
-EntityID EntityAtPosition(World& world, const Vec2& position) {
-    auto entities = world.EntitiesWithFlags(EntityFlags::TRANSFORM);
-
-    for (int i = 0; i < entities.Size(); i++) {
-        EntityID id = entities[i];
-        const Transform& transform = world.GetEntityData(id)->transform;
-
-        if (PointInRect(position, GetEntityRect(world, id))) {
-            return id;
-        }
-    }
-
-    return 0;
 }
 
 void MoveEntityAlongPath(Transform& transform, Motion& motion, List<Vec2, MAX_PATH_SIZE>& path) {
@@ -175,6 +161,7 @@ void CollisionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
 }
 
 void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
+    Renderer2D::Begin();
     Renderer2D::Clear({ 0.25f, 0.25f, 0.25f, 1.0f });
     
     for (int i = 0; i < entities.Size(); i++) {
@@ -189,7 +176,7 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
         const List<Vec2, MAX_PATH_SIZE>& path = entity->path;
         const Texture2D& texture = entity->texture;
 
-        RenderPath(path);
+        DebugDrawPath(entities[i]);
 
         SDL_FRect rect = {
             transform.position.x - (transform.size.x / 2.0f),
@@ -205,31 +192,17 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
             Renderer2D::DrawLine(transform.position, transform.position + (motion.velocity.Normalized() * 100), BLUE);
         }
     }
+
+    Renderer2D::End();
 }
 
-bool m_canDrawPath = false;
-EntityID m_selectedEntity = 0;
-Vec2 m_lastMousePos;
-
-Texture2D m_texture;
-
-World m_world;
-
-int m_tileSize = 32;
-List<Vec2, MAX_PATH_SIZE> m_path;
-
-int m_lastTileX = 0;
-int m_lastTileY = 0;
-
 void OnInit() {
-    m_texture = Renderer2D::LoadTexture("data/kenney_pixel-shmup/Ships/ship_0000.png");
-
     //m_world.AddSystem(TRANSFORM | MOTION | PATH, PhysicsSystem);
-    m_world.AddSystem(TRANSFORM, CollisionSystem);
-    m_world.AddSystem(TRANSFORM | MOTION | SPRITE | PATH, RenderSystem);
+    m_gameState.world.AddSystem(TRANSFORM, CollisionSystem);
+    m_gameState.world.AddSystem(TRANSFORM | MOTION | SPRITE | PATH, RenderSystem);
 
     {
-        EntityData* entity = m_world.CreateEntity(TRANSFORM | MOTION | SPRITE | PATH);
+        EntityData* entity = m_gameState.world.CreateEntity(TRANSFORM | MOTION | SPRITE | PATH);
 
         entity->transform.position.x = 640;
         entity->transform.position.y = 360;
@@ -239,93 +212,17 @@ void OnInit() {
 
         entity->motion.velocity = { 75, 0 };
 
-        entity->texture = m_texture;
+        entity->texture = Renderer2D::LoadTexture("data/kenney_pixel-shmup/Ships/ship_0000.png");
     }
 }
 
 void OnUpdate(const TimeStep& timeStep) {
     Application::SetWindowTitle(std::format("FrameTime: {} ms", timeStep.DeltaTimeMS()));
+    
+    UpdateInputState();
+    PlacePathPoint();
 
-#if 0
-    int mouseX, mouseY;
-    int mouseState = SDL_GetMouseState(&mouseX, &mouseY);
-
-    Vec2 mousePos = { (float)mouseX, (float)mouseY };
-
-    if ((mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && !m_canDrawPath) {
-        m_selectedEntity = EntityAtPosition(m_world, mousePos);
-
-        if (m_selectedEntity != 0) {
-            EntityData* entity = m_world.GetEntityData(m_selectedEntity);
-
-            m_canDrawPath = true;
-            entity->path.Clear();
-        }
-    }
-    else if (!(mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && m_canDrawPath) {
-        m_canDrawPath = false;
-        m_selectedEntity = 0;
-    }
-
-    if (m_canDrawPath) {
-        if (mousePos != m_lastMousePos) {
-            EntityData* entity = m_world.GetEntityData(m_selectedEntity);
-            if (!entity->path.Full()) {
-                entity->path.Push(mousePos);
-            }
-        }
-
-        m_lastMousePos = mousePos;
-    }
-#endif
-    Renderer2D::Begin();
-
-    Vec2 mousePos = Application::MousePos();
-
-    if (Application::MousePressed(SDL_BUTTON_LEFT)) {
-        m_selectedEntity = EntityAtPosition(m_world, mousePos);
-        
-        if (m_selectedEntity != 0) {
-            m_canDrawPath = true;
-            m_path.Clear();
-        }
-    }
-    else if (Application::MouseReleased(SDL_BUTTON_LEFT)) {
-        m_canDrawPath = false;
-    }
-
-    if (m_canDrawPath && !m_path.Full()) {
-        int tileX = mousePos.x / m_tileSize;
-        int tileY = mousePos.y / m_tileSize;
-
-        if (tileX != m_lastTileX || tileY != m_lastTileY) {
-            f32 x = (tileX * m_tileSize) + (m_tileSize / 2);
-            f32 y = (tileY * m_tileSize) + (m_tileSize / 2);
-
-            m_path.Push({ x, y });
-        }
-
-        m_lastTileX = tileX;
-        m_lastTileY = tileY;
-    }
-
-    m_world.RunSystems();
-
-    Vec2 windowSize = Application::WindowSize();
-
-    // draw path
-    if (m_path.Size() > 2) {
-        for (int i = 0; i < m_path.Size() - 1; i++) {
-            Renderer2D::DrawLine(m_path[i], m_path[i + 1], RED);
-        }
-    }
-
-    // draw path points
-    for (int i = 0; i < m_path.Size(); i++) {
-        Renderer2D::DrawRect(m_path[i], { (f32) m_tileSize / 4, (f32)m_tileSize / 4 }, WHITE);
-    }
-
-    Renderer2D::End();
+    m_gameState.world.RunSystems();
 }
 
 int main(int argc, char** argv) {
