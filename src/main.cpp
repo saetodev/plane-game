@@ -33,12 +33,28 @@ void MotionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
         motion.velocity    += motion.acceleration * timeStep.DeltaTime();
         transform.position += motion.velocity * timeStep.DeltaTime();
 
+        /*
         if (transform.position.x < 0 || transform.position.x > windowSize.x) {
             motion.velocity.x = -motion.velocity.x;
         }
 
         if (transform.position.y < 0 || transform.position.y > windowSize.y) {
             motion.velocity.y = -motion.velocity.y;
+        }
+        */
+
+        if (transform.position.x < 0) {
+            transform.position.x = windowSize.x - 1;
+        }
+        else if (transform.position.x > windowSize.x) {
+            transform.position.x = 1;
+        }
+
+        if (transform.position.y < 0) {
+            transform.position.y = windowSize.y - 1;
+        }
+        else if (transform.position.y > windowSize.y) {
+            transform.position.y = 1;
         }
 
         transform.rotation = motion.velocity.Angle();
