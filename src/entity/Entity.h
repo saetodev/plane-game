@@ -25,11 +25,8 @@ struct Motion {
     f32 angularAcceleration;
 };
 
-struct Color {
-    u8 r;
-    u8 g;
-    u8 b;
-    u8 a;
+struct Path {
+    List<Vec2, MAX_PATH_SIZE> points;
 };
 
 struct EntityData {

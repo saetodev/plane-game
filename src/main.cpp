@@ -1,6 +1,7 @@
 #include "core/Application.h"
 #include "core/renderer/Renderer2D.h"
 #include "core/renderer/Texture.h"
+#include "core/renderer/Shader.h"
 #include "entity/Entity.h"
 #include "entity/World.h"
 #include "game.h"
@@ -11,112 +12,40 @@
 
 #include <SDL2/SDL.h>
 
-struct Rect {
-    Vec2 position;
-    Vec2 size;
-};
+#include <imgui.h>
+#include <imgui_impl_sdl2.h>
+#include <imgui_impl_opengl3.h>
 
-bool PointInRect(const Vec2& point, const Rect& rect) {
-    return (point.x >= rect.position.x) && 
-           (point.x <= rect.position.x + rect.size.x) && 
-           (point.y >= rect.position.y) && 
-           (point.y <= rect.position.y + rect.size.y);
-}
-
-bool RectInRect(const Rect& a, const Rect& b) {
-    return (a.position.x + a.size.x >= b.position.x) &&
-           (a.position.x <= b.position.x + b.size.x) && 
-           (a.position.y + a.size.y >= b.position.y) && 
-           (a.position.y <= b.position.y + b.size.y);
-}
-
-Rect GetEntityRect(World& world, EntityID id) {
-    EntityData* entity = world.GetEntityData(id);
-
-    if (!entity) {
-        return {};
-    }
-
-    return {
-        .position = {
-            entity->transform.position.x - (entity->transform.size.x / 2.0f),
-            entity->transform.position.y - (entity->transform.size.y / 2.0f),
-        },
-
-        .size = {
-            entity->transform.size.x,
-            entity->transform.size.y,
-        },
-    };
-}
-
-void MoveEntityAlongPath(Transform& transform, Motion& motion, List<Vec2, MAX_PATH_SIZE>& path) {
-    if (path.Size() < 2) {
-        motion.acceleration = { 0, 0 };
-        return;
-    }
-
-    Vec2 targetPoint = path[0];
-    Vec2 moveVector  = targetPoint - transform.position;
-
-    if (moveVector.Length() < 1) {
-        path.Remove(0);
-
-        targetPoint = path[0];
-        moveVector = targetPoint - transform.position;
-    }
-
-    f32 speed = motion.velocity.Length();
-
-    Vec2 currentDirection = motion.velocity.Normalized();
-    Vec2 nextDirection    = moveVector.Normalized();
-
-    motion.acceleration = (nextDirection - currentDirection) * speed;
-}
-
-void IntegrateMotion(Transform& transform, Motion& motion, const TimeStep& timeStep) {
-    motion.velocity += motion.acceleration;
-    transform.position += motion.velocity * timeStep.DeltaTime();
-
-    transform.rotation = motion.velocity.Angle();
-}
-
-void ForceBoundaryConditions(Transform& transform, Motion& motion) {
-    float x0 = transform.position.x - (transform.size.x / 2.0f);
-    float y0 = transform.position.y - (transform.size.y / 2.0f);
-
-    float x1 = x0 + transform.size.x;
-    float y1 = y0 + transform.size.y;
-
+void MotionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
     Vec2 windowSize = Application::WindowSize();
-
-    if (x0 <= 0 || x1 >= windowSize.x) {
-        motion.velocity.x  = -motion.velocity.x;
-        transform.rotation = motion.velocity.Angle();
-    }
-
-    if (y0 <= 0 || y1 >= windowSize.y) {
-        motion.velocity.y  = -motion.velocity.y;
-        transform.rotation = motion.velocity.Angle();
-    }
-}
-
-void RenderPath(const List<Vec2, MAX_PATH_SIZE>& path) {
-    if (path.Size() < 2) {
-        return;
-    }
-
-    for (int i = 0; i < path.Size() - 1; i++) {
-        Vec2 start = path[i];
-        Vec2 end = path[i + 1];
-
-        Renderer2D::DrawLine(start, end, RED);
-    }
-}
-
-void PhysicsSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
     const TimeStep& timeStep = Application::FrameTime();
+    
+    for (int i = 0; i < entities.Size(); i++) {
+        EntityData* entity = world->GetEntityData(entities[i]);
 
+        if (!entity) {
+            continue;
+        }
+
+        Transform& transform = entity->transform;
+        Motion& motion       = entity->motion;
+
+        motion.velocity    += motion.acceleration * timeStep.DeltaTime();
+        transform.position += motion.velocity * timeStep.DeltaTime();
+
+        if (transform.position.x < 0 || transform.position.x > windowSize.x) {
+            motion.velocity.x = -motion.velocity.x;
+        }
+
+        if (transform.position.y < 0 || transform.position.y > windowSize.y) {
+            motion.velocity.y = -motion.velocity.y;
+        }
+
+        transform.rotation = motion.velocity.Angle();
+    }
+}
+
+void PathSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
     for (int i = 0; i < entities.Size(); i++) {
         EntityData* entity = world->GetEntityData(entities[i]);
 
@@ -128,35 +57,23 @@ void PhysicsSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
         Motion& motion = entity->motion;
         List<Vec2, MAX_PATH_SIZE>& path = entity->path;
 
-        std::cout << "ROTATION: " << transform.rotation << std::endl;
-
-        MoveEntityAlongPath(transform, motion, path);
-        IntegrateMotion(transform, motion, timeStep);
-        ForceBoundaryConditions(transform, motion);
-    }
-}
-
-void CollisionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
-    for (int i = 0; i < entities.Size() - 1; i++) {
-        for (int j = i + 1; j < entities.Size(); j++) {
-            EntityData* entityA = world->GetEntityData(entities[i]);
-            EntityData* entityB = world->GetEntityData(entities[j]);
-
-            if (!entityA) {
-                break;
-            }
-            else if (!entityB) {
-                continue;
-            }
-
-            Rect rectA = GetEntityRect(*world, entityA->id);
-            Rect rectB = GetEntityRect(*world, entityB->id);
-
-            if (RectInRect(rectA, rectB)) {
-                world->DestroyEntity(entityA->id);
-                world->DestroyEntity(entityB->id);
-            }
+        if (path.Size() < 2) {
+            motion.acceleration = {};
+            continue;
         }
+
+        Vec2 targetPoint = path[0];
+        Vec2 moveVector  = targetPoint - transform.position;
+
+        if (moveVector.Length() <= m_gameState.tileSize) {
+            path.Remove(0);
+
+            targetPoint = path[0];
+            moveVector = targetPoint - transform.position;
+        }
+
+        Vec2 targetVelocity = moveVector.Normalized() * 75;
+        motion.acceleration = targetVelocity - motion.velocity;
     }
 }
 
@@ -189,7 +106,8 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
         
         // debug
         {
-            Renderer2D::DrawLine(transform.position, transform.position + (motion.velocity.Normalized() * 100), BLUE);
+            Renderer2D::DrawLine(transform.position, transform.position + motion.acceleration, GREEN);
+            Renderer2D::DrawLine(transform.position, transform.position + motion.velocity, BLUE);
         }
     }
 
@@ -197,20 +115,27 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
 }
 
 void OnInit() {
-    //m_world.AddSystem(TRANSFORM | MOTION | PATH, PhysicsSystem);
-    m_gameState.world.AddSystem(TRANSFORM, CollisionSystem);
+    m_gameState.world.AddSystem(TRANSFORM | MOTION | PATH, PathSystem);
+    m_gameState.world.AddSystem(TRANSFORM | MOTION, MotionSystem);
     m_gameState.world.AddSystem(TRANSFORM | MOTION | SPRITE | PATH, RenderSystem);
 
-    {
+    Vec2 windowSize = Application::WindowSize();
+
+    srand(time(NULL));
+
+    for (int i = 0; i < 5; i++) {
         EntityData* entity = m_gameState.world.CreateEntity(TRANSFORM | MOTION | SPRITE | PATH);
 
-        entity->transform.position.x = 640;
-        entity->transform.position.y = 360;
+        entity->transform.position.x = (rand() % (int)windowSize.x - 32) + 32;
+        entity->transform.position.y = (rand() % (int)windowSize.y - 32) + 32;
 
-        entity->transform.size.x = 64;
-        entity->transform.size.y = 64;
+        entity->transform.size.x = 80;
+        entity->transform.size.y = 80;
 
-        entity->motion.velocity = { 75, 0 };
+        f32 angle = (rand() % 360) * DEG_TO_RAD;
+
+        entity->motion.velocity.x = 75 * cosf(angle);
+        entity->motion.velocity.y = 75 * sinf(angle);
 
         entity->texture = Renderer2D::LoadTexture("data/kenney_pixel-shmup/Ships/ship_0000.png");
     }
@@ -223,6 +148,30 @@ void OnUpdate(const TimeStep& timeStep) {
     PlacePathPoint();
 
     m_gameState.world.RunSystems();
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("Info Panel");
+
+    EntityData* entity = m_gameState.world.GetEntityData(m_gameState.selectedEntity);
+    
+    if (entity) {
+        ImGui::Text("Entity ID: %llu", m_gameState.selectedEntity);
+        ImGui::Text("Position: %f, %f", entity->transform.position.x, entity->transform.position.y);
+        ImGui::Text("Size: %f, %f", entity->transform.size.x, entity->transform.size.y);
+        ImGui::Text("Rotation: %f", entity->transform.rotation);
+        ImGui::Text("Velocity: %f, %f", entity->motion.velocity.x, entity->motion.velocity.y);
+        ImGui::Text("Acceleration: %f, %f", entity->motion.acceleration.x, entity->motion.acceleration.y);
+    }
+    
+    ImGui::End();
+
+    Renderer2D::UseShader(0);
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 int main(int argc, char** argv) {

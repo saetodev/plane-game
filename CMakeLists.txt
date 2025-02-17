@@ -5,10 +5,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 file(GLOB_RECURSE SRC_FILES "src/*.cpp")
+file(GLOB IMGUI_SRC_FILES "vendor/imgui/*.cpp")
 
-include_directories(src)
+include_directories(src "vendor/imgui" "vendor/imgui/backends" "vendor/sdl/include/SDL2")
 
-add_executable(${PROJECT_NAME} ${SRC_FILES} "vendor/glad/src/glad.c")
+add_executable(${PROJECT_NAME} ${SRC_FILES} ${IMGUI_SRC_FILES} "vendor/glad/src/glad.c" "vendor/imgui/backends/imgui_impl_opengl3.cpp" "vendor/imgui/backends/imgui_impl_sdl2.cpp")
 
 if(WIN32)
     target_include_directories(${PROJECT_NAME} PUBLIC "vendor/sdl/include" "vendor/glad/include" "vendor/stb")

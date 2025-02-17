@@ -7,6 +7,12 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
+#include <imgui.h>
+#include <imgui_impl_sdl2.h>
+
+#define IMGUI_IMPL_OPENGL_ES2
+#include <imgui_impl_opengl3.h>
+
 enum ErrorType {
     ERROR_INIT,
     ERROR_GL_CONTEXT,
@@ -53,7 +59,7 @@ void Application::Init(const AppDesc& desc) {
 
     /* INIT OPENGL CONTEXT */
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 
     m_window = SDL_CreateWindow(desc.windowTitle.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, desc.windowWidth, desc.windowHeight, SDL_WINDOW_OPENGL);
@@ -80,8 +86,19 @@ void Application::Init(const AppDesc& desc) {
         std::exit(ERROR_GL_LOAD);
     }
 
+    SDL_GL_SetSwapInterval(1);
+
     /* MISC */
     Renderer2D::Init();
+
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui_ImplSDL2_InitForOpenGL(m_window, m_context);
+    ImGui_ImplOpenGL3_Init("#version 100");
 
     m_running = true;
 }
@@ -117,6 +134,8 @@ void Application::Run(AppInitCB onInit, AppUpdateCB onUpdate) {
         SDL_Event event;
 
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL2_ProcessEvent(&event);
+
             switch (event.type) {
                 case SDL_QUIT: {
                     m_running = false;

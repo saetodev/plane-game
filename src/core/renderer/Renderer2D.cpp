@@ -4,6 +4,8 @@
 #include "Shader.h"
 #include "core/Util.h"
 
+#include <iostream>
+
 #include <glad/glad.h>
 
 using namespace Renderer2D;
@@ -89,7 +91,7 @@ static void Flush() {
         UseShader(m_lineShader);
         EnableAttributes(m_lineVBO);
 
-        SetBufferData(m_lineVBO, sizeof(QuadVertex) * m_lineVertexBuffer.Size(), m_lineVertexBuffer.Data());
+        SetBufferData(m_lineVBO, sizeof(LineVertex) * m_lineVertexBuffer.Size(), m_lineVertexBuffer.Data());
         DrawBuffer(m_lineVBO, GL_LINES, m_lineVertexBuffer.Size());
 
         m_lineVertexBuffer.Clear();
@@ -97,6 +99,16 @@ static void Flush() {
 }
 
 void Renderer2D::Init() {
+    auto version  = (const char*)glGetString(GL_VERSION);
+    auto renderer = (const char*)glGetString(GL_RENDERER);
+    auto vendor   = (const char*)glGetString(GL_VENDOR);
+    auto shading  = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+    std::cout << "GL Version:   " << version << std::endl;
+    std::cout << "Renderer:     " << renderer << std::endl;
+    std::cout << "Vendor:       " << vendor << std::endl;
+    std::cout << "GLSL Version: " << shading << std::endl;
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 

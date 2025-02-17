@@ -16,7 +16,7 @@ struct GameState {
     int lastTileX;
     int lastTileY;
 
-    int tileSize = 32;
+    int tileSize = 16;
 
     World world;
 };
