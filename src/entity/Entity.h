@@ -20,9 +20,6 @@ enum EntityFlags {
 struct Motion {
     Vec2 velocity;
     Vec2 acceleration;
-
-    f32 angularVelocity;
-    f32 angularAcceleration;
 };
 
 struct Path {

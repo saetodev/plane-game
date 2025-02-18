@@ -25,6 +25,7 @@ namespace Renderer2D {
     void DrawRect(const Transform& transform, const Vec4& color);
 
     void DrawRectLines(const Vec2& position, const Vec2& size, const Vec4& color);
+    void DrawRectLines(const Transform& transform, const Vec4& color);
 
     void DrawTexture(const Texture2D& texture, const Vec2& position, const Vec2& size, const Vec4& color);
     void DrawTexture(const Texture2D& texture, const Transform& transform, const Vec4& color);

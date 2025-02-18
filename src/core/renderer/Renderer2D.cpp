@@ -197,6 +197,20 @@ void Renderer2D::DrawRectLines(const Vec2& position, const Vec2& size, const Vec
     DrawLine({ x0, y0 }, { x0, y1 }, color); // left
 }
 
+void Renderer2D::DrawRectLines(const Transform& transform, const Vec4& color) {
+    Mat4 transformMatrix = transform.Matrix();
+
+    Vec2 tl = transformMatrix * Vec2{ -0.5,  0.5 };
+    Vec2 tr = transformMatrix * Vec2{  0.5,  0.5 };
+    Vec2 bl = transformMatrix * Vec2{ -0.5, -0.5 };
+    Vec2 br = transformMatrix * Vec2{  0.5, -0.5 };
+
+    DrawLine(tl, tr, color); // top
+    DrawLine(tr, br, color); // right
+    DrawLine(bl, br, color); // bottom
+    DrawLine(tl, bl, color); // left
+}
+
 void Renderer2D::DrawTexture(const Texture2D& texture, const Vec2& position, const Vec2& size, const Vec4& color) {
     DrawTexture(texture, { position, size }, color);
 }

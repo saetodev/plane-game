@@ -36,6 +36,23 @@ static TimeStep m_timeStep;
 static InputButton m_keys[MAX_KEY_COUNT];
 static InputButton m_buttons[MAX_BUTTON_COUNT];
 
+static void InitImGui() {
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui_ImplSDL2_InitForOpenGL(m_window, m_context);
+    ImGui_ImplOpenGL3_Init("#version 100");
+}
+
+static void ShutdownImGui() {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+}
+
 void TimeStep::Update() {
     m_startTime = SDL_GetTicks64();
     m_deltaTime = (float)(m_startTime - m_endTime) / 1000;
@@ -83,20 +100,13 @@ void Application::Init(const AppDesc& desc) {
 
     /* MISC */
     Renderer2D::Init();
-
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-
-    ImGui_ImplSDL2_InitForOpenGL(m_window, m_context);
-    ImGui_ImplOpenGL3_Init("#version 100");
+    InitImGui();
 
     m_running = true;
 }
 
 void Application::Shutdown() {
+    ShutdownImGui();
     Renderer2D::Shutdown();
 
     SDL_GL_DeleteContext(m_context);
@@ -178,6 +188,17 @@ void Application::Run(AppInitCB onInit, AppUpdateCB onUpdate) {
 
         SDL_GL_SwapWindow(m_window);
     }
+}
+
+void Application::ImGuiNewFrame() {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+}
+
+void Application::ImGuiRender() {
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 const TimeStep& Application::FrameTime() {

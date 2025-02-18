@@ -10,11 +10,8 @@
 #include <iostream>
 #include <random>
 
-#include <SDL.h>
-
 #include <imgui.h>
-#include <imgui_impl_sdl2.h>
-#include <imgui_impl_opengl3.h>
+#include <SDL.h>
 
 void MotionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
     Vec2 windowSize = Application::WindowSize();
@@ -33,28 +30,12 @@ void MotionSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
         motion.velocity    += motion.acceleration * timeStep.DeltaTime();
         transform.position += motion.velocity * timeStep.DeltaTime();
 
-        /*
         if (transform.position.x < 0 || transform.position.x > windowSize.x) {
             motion.velocity.x = -motion.velocity.x;
         }
 
         if (transform.position.y < 0 || transform.position.y > windowSize.y) {
             motion.velocity.y = -motion.velocity.y;
-        }
-        */
-
-        if (transform.position.x < 0) {
-            transform.position.x = windowSize.x - 1;
-        }
-        else if (transform.position.x > windowSize.x) {
-            transform.position.x = 1;
-        }
-
-        if (transform.position.y < 0) {
-            transform.position.y = windowSize.y - 1;
-        }
-        else if (transform.position.y > windowSize.y) {
-            transform.position.y = 1;
         }
 
         transform.rotation = motion.velocity.Angle();
@@ -75,13 +56,18 @@ void PathSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
 
         if (path.Size() < 2) {
             motion.acceleration = {};
+            motion.velocity = motion.velocity.Normalized() * 75;
             continue;
         }
 
         Vec2 targetPoint = path[0];
         Vec2 moveVector  = targetPoint - transform.position;
 
-        if (moveVector.Length() <= m_gameState.tileSize) {
+        //TODO: the position of this entity, is actually at the 
+        //      center of any texture that we may draw. we should 
+        //      move on to the next point if the target point is within 
+        //      the rect that contains the texture (i.e. use tranform.size)
+        if (moveVector.Length() <= m_gameState.tileSize * 2) {
             path.Remove(0);
 
             targetPoint = path[0];
@@ -122,7 +108,8 @@ void RenderSystem(World* world, List<EntityID, MAX_ENTITY_COUNT>& entities) {
         
         // debug
         {
-            Renderer2D::DrawLine(transform.position, transform.position + motion.acceleration, GREEN);
+            Renderer2D::DrawRectLines(transform, GREEN);
+            Renderer2D::DrawLine(transform.position, transform.position + motion.acceleration, {1, 0, 1, 1 });
             Renderer2D::DrawLine(transform.position, transform.position + motion.velocity, BLUE);
         }
     }
@@ -139,7 +126,7 @@ void OnInit() {
 
     srand(time(NULL));
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 1; i++) {
         EntityData* entity = m_gameState.world.CreateEntity(TRANSFORM | MOTION | SPRITE | PATH);
 
         entity->transform.position.x = (rand() % (int)windowSize.x - 32) + 32;
@@ -160,16 +147,22 @@ void OnInit() {
 void OnUpdate(const TimeStep& timeStep) {
     Application::SetWindowTitle(std::format("FrameTime: {} ms", timeStep.DeltaTimeMS()));
     
-    UpdateInputState();
-    PlacePathPoint();
+    ImGuiIO& io = ImGui::GetIO();
+
+    if (m_gameState.canDrawPath) {
+        io.WantCaptureMouse = false;
+    }
+
+    if (!io.WantCaptureMouse) {
+        UpdateInputState();
+        PlacePathPoint();
+    }
 
     m_gameState.world.RunSystems();
 
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
+    Application::ImGuiNewFrame();
 
-    ImGui::Begin("Info Panel");
+    ImGui::Begin("Entity Info");
 
     EntityData* entity = m_gameState.world.GetEntityData(m_gameState.selectedEntity);
     
@@ -179,15 +172,13 @@ void OnUpdate(const TimeStep& timeStep) {
         ImGui::Text("Size: %f, %f", entity->transform.size.x, entity->transform.size.y);
         ImGui::Text("Rotation: %f", entity->transform.rotation);
         ImGui::Text("Velocity: %f, %f", entity->motion.velocity.x, entity->motion.velocity.y);
+        ImGui::Text("Speed: %f", entity->motion.velocity.Length());
         ImGui::Text("Acceleration: %f, %f", entity->motion.acceleration.x, entity->motion.acceleration.y);
     }
     
     ImGui::End();
 
-    Renderer2D::UseShader(0);
-
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    Application::ImGuiRender();
 }
 
 int main(int argc, char** argv) {

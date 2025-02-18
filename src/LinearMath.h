@@ -149,6 +149,19 @@ struct Mat4 {
 
 /* MAT4 OPERATORS */
 
+inline Vec2 operator*(const Mat4& m, const Vec2& v) {
+    Vec4 nv = { v.x, v.y, 0.0f, 1.0f };
+
+    Vec4 tv = {
+        .x = m.r0.Dot(nv),
+        .y = m.r1.Dot(nv),
+        .z = m.r2.Dot(nv),
+        .w = m.r3.Dot(nv),
+    };
+
+    return { tv.x, tv.y };
+}
+
 inline Vec4 operator*(const Mat4& m, const Vec4& v) {
     return {
         .x = m.r0.Dot(v),

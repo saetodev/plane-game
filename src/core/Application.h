@@ -39,6 +39,9 @@ namespace Application {
 
     void Run(AppInitCB onInit, AppUpdateCB onUpdate);
 
+    void ImGuiNewFrame();
+    void ImGuiRender();
+
     const TimeStep& FrameTime();
 
     bool KeyDown(int key);
