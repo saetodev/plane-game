@@ -4,9 +4,7 @@
 #include <iostream>
 
 #include <glad/glad.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-
+#include <SDL.h>
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
 
@@ -48,11 +46,6 @@ void Application::Init(const AppDesc& desc) {
     /* INIT SUBSYSTEMS */
 
     if (SDL_Init(SDL_INIT_VIDEO)) {
-        std::cout << "ERROR: " << SDL_GetError() << std::endl;
-        std::exit(ERROR_INIT);
-    }
-
-    if (!IMG_Init(IMG_INIT_PNG)) {
         std::cout << "ERROR: " << SDL_GetError() << std::endl;
         std::exit(ERROR_INIT);
     }
@@ -109,7 +102,6 @@ void Application::Shutdown() {
     SDL_GL_DeleteContext(m_context);
     SDL_DestroyWindow(m_window);
 
-    IMG_Quit();
     SDL_Quit();
 }
 

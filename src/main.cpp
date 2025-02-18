@@ -10,7 +10,7 @@
 #include <iostream>
 #include <random>
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
